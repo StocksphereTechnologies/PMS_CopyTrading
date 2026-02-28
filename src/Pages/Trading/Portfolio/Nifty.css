@@ -1,0 +1,121 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+#mainNB {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#tab_box {
+  width: 100%;
+  background-color: #9ae1ec18;
+  border: 0.1rem solid black;
+  font-family: Verdana, sans-serif;
+  padding-bottom: 16px;  
+}
+
+.title {
+  border-bottom: 0.1rem solid black;
+  text-align: center;
+  padding: 0.8rem;
+}
+
+.title h3 {
+  font-size: 2rem;
+}
+
+#tab_box .col {
+  width: 95%;
+  height: 6rem;
+  /* background-color: bisque; */
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  justify-self: center;
+}
+
+/* .col .price{
+  width: 20%;
+  height: 4rem;
+  background-color: aquamarine;
+  display: flex;
+  justify-content: center;
+} */
+
+.col .btns {
+  width: 12%;
+  height: 4rem;
+  /* background-color: aquamarine; */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btns .buy {
+  width: 45%;
+  height: 3rem;
+  background-color: rgb(54, 54, 54);
+  border-radius: 0.3rem;
+}
+
+.btns .sell {
+  width: 45%;
+  height: 3rem;
+  background-color: rgb(54, 54, 54);
+  border-radius: 0.3rem;
+}
+
+.btns .buy button {
+  width: 100%;
+  height: 3rem;
+  background-color: #12b886;
+  border-bottom: 0.2rem solid #0ca678;
+  border-right: 0.2rem solid #0ca678;
+  border-top: 0.2rem solid #12b886;
+  border-left: 0.2rem solid #12b886;
+  font-size: 1.1rem;
+  color: white;
+  font-weight: 500;
+  border-radius: 0.3rem;
+}
+
+.buy button:hover {
+  background-color: #20c997;
+  transition: 0.5s;
+}
+
+.btns .sell button {
+  width: 100%;
+  height: 3rem;
+  background-color: #e03131;
+  border-bottom: 0.2rem solid #c92a2a;
+  border-right: 0.2rem solid #c92a2a;
+  border-top: 0.2rem solid #e03131;
+  border-left: 0.2rem solid #e03131;
+  font-size: 1.1rem;
+  color: white;
+  font-weight: 500;
+  border-radius: 0.3rem;
+}
+
+.sell button:hover {
+  background-color: #fa5252;
+  transition: 0.5s;
+}
+
+#tab_box .options {
+  width: 95%;
+  background-color: #9ae1ec18;
+  margin: auto;
+}
+
+.options .tabs {
+  width: 100%;
+  height: 3.5rem;
+  background-color: #9ae1ec2f;
+  border-bottom: 0.3rem solid rgb(94, 94, 94);
+}

@@ -1,0 +1,54 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Redis
+redis[hiredis]==5.0.1
+
+# Broker APIs
+kiteconnect==4.2.0
+py5paisa==0.7.21.2
+
+# TOTP for automated login
+pyotp==2.9.0
+
+# Encryption
+cryptography==41.0.7
+
+# HTTP requests for login
+requests==2.31.0
+
+# WebSocket support
+websockets==12.0
+
+# JWT for token decoding
+PyJWT
+
+# Pandas for DataFrame handling (if py5paisa returns DataFrames)
+pandas==2.1.4
+
+# Playwright for headless browser automation (Zerodha login)
+playwright==1.40.0
+selenium
+pytz==2023.3
+
+# Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# Authentication (NEW - for user system)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+email-validator==2.1.0
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
