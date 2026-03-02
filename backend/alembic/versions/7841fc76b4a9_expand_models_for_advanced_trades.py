@@ -28,14 +28,15 @@ def upgrade() -> None:
                existing_type=sa.BOOLEAN(),
                nullable=False,
                existing_server_default=sa.text('true'))
-    op.drop_index('idx_accounts_owner_id', table_name='accounts')
-    op.drop_index('idx_accounts_subscription_end', table_name='accounts')
-    op.drop_index('idx_accounts_user_id', table_name='accounts')
-    op.drop_index('idx_accounts_validated', table_name='accounts')
-    op.create_index(op.f('ix_accounts_is_paid'), 'accounts', ['is_paid'], unique=False)
-    op.create_index(op.f('ix_accounts_is_validated'), 'accounts', ['is_validated'], unique=False)
-    op.create_index(op.f('ix_accounts_owner_id'), 'accounts', ['owner_id'], unique=False)
-    op.drop_constraint('fk_accounts_owner_id', 'accounts', type_='foreignkey')
+    op.drop_index('idx_accounts_owner_id', table_name='accounts', if_exists=True)
+    op.drop_index('ix_accounts_owner_id', table_name='accounts', if_exists=True)
+    op.drop_index('idx_accounts_subscription_end', table_name='accounts', if_exists=True)
+    op.drop_index('idx_accounts_user_id', table_name='accounts', if_exists=True)
+    op.drop_index('idx_accounts_validated', table_name='accounts', if_exists=True)
+    op.create_index(op.f('ix_accounts_is_paid'), 'accounts', ['is_paid'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_accounts_is_validated'), 'accounts', ['is_validated'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_accounts_owner_id'), 'accounts', ['owner_id'], unique=False, if_not_exists=True)
+    op.execute('ALTER TABLE accounts DROP CONSTRAINT IF EXISTS fk_accounts_owner_id CASCADE')
     op.add_column('trades', sa.Column('trigger_price', sa.Float(), nullable=True))
     op.add_column('trades', sa.Column('product', sa.String(length=50), nullable=True))
     op.add_column('trades', sa.Column('target', sa.Float(), nullable=True))
@@ -49,12 +50,13 @@ def upgrade() -> None:
     op.add_column('trades', sa.Column('split_qty', sa.Integer(), nullable=True))
     op.add_column('trades', sa.Column('multiplier_active', sa.Boolean(), nullable=True))
     op.add_column('trades', sa.Column('group_acc_active', sa.Boolean(), nullable=True))
-    op.drop_index('idx_trades_owner_id', table_name='trades')
-    op.drop_index('idx_trades_user_id', table_name='trades')
-    op.create_index(op.f('ix_trades_owner_id'), 'trades', ['owner_id'], unique=False)
-    op.drop_constraint('trades_user_id_fkey', 'trades', type_='foreignkey')
-    op.drop_constraint('fk_trades_owner_id', 'trades', type_='foreignkey')
-    op.drop_column('trades', 'user_id')
+    op.drop_index('idx_trades_owner_id', table_name='trades', if_exists=True)
+    op.drop_index('ix_trades_owner_id', table_name='trades', if_exists=True)
+    op.drop_index('idx_trades_user_id', table_name='trades', if_exists=True)
+    op.create_index(op.f('ix_trades_owner_id'), 'trades', ['owner_id'], unique=False, if_not_exists=True)
+    op.execute('ALTER TABLE trades DROP CONSTRAINT IF EXISTS trades_user_id_fkey CASCADE')
+    op.execute('ALTER TABLE trades DROP CONSTRAINT IF EXISTS fk_trades_owner_id CASCADE')
+    op.execute('ALTER TABLE trades DROP COLUMN IF EXISTS user_id CASCADE')
     op.alter_column('users', 'is_active',
                existing_type=sa.BOOLEAN(),
                nullable=False,
@@ -67,14 +69,15 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(timezone=True),
                nullable=False,
                existing_server_default=sa.text('now()'))
-    op.drop_index('idx_users_active', table_name='users')
-    op.drop_index('idx_users_email', table_name='users')
-    op.drop_index('idx_users_phone', table_name='users')
-    op.drop_constraint('users_email_key', 'users', type_='unique')
-    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
-    op.create_index(op.f('ix_users_is_active'), 'users', ['is_active'], unique=False)
-    op.create_index(op.f('ix_users_phone_number'), 'users', ['phone_number'], unique=False)
-    op.create_index(op.f('ix_users_user_id'), 'users', ['user_id'], unique=False)
+    op.drop_index('idx_users_active', table_name='users', if_exists=True)
+    op.drop_index('idx_users_email', table_name='users', if_exists=True)
+    op.drop_index('idx_users_phone', table_name='users', if_exists=True)
+    op.drop_index('ix_users_phone_number', table_name='users', if_exists=True)
+    op.execute('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key CASCADE')
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True, if_not_exists=True)
+    op.create_index(op.f('ix_users_is_active'), 'users', ['is_active'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_users_phone_number'), 'users', ['phone_number'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_users_user_id'), 'users', ['user_id'], unique=False, if_not_exists=True)
     # ### end Alembic commands ###
 
 

@@ -1,151 +1,99 @@
-import React from 'react';
-import SmartTable from '../../Components/Table'; // Adjust import path if needed
-import { Button } from 'antd';
+import React, { useState } from "react";
+import { Button, Row, Col, Dropdown, Select } from "antd";
+import { DownOutlined } from "@ant-design/icons";
+import MarketWatchTable from "./MarketWatchTable";
 
-const columns = [
-    {
-        title: 'Symbol',
-        dataIndex: 'symbol',
-        key: 'symbol',
-        fixed: 'left',
-        width: 220,
-    },
-    {
-        title: 'Ltp',
-        dataIndex: 'ltp',
-        key: 'ltp',
-        width: 100,
-        render: (value: string) => (
-            <div style={{ background: '#fffbe6', textAlign: 'center' }}>{value}</div>
-        ),
-    },
-    {
-        title: 'Buy',
-        key: 'buy',
-        width: 80,
-        render: () => (
-            <Button type="primary" size="small" style={{ background: '#52c41a' }}>
-                Buy
-            </Button>
-        ),
-    },
-    {
-        title: 'Sell',
-        key: 'sell',
-        width: 80,
-        render: () => (
-            <Button type="primary" danger size="small">
-                Sell
-            </Button>
-        ),
-    },
-    {
-        title: '% Chg',
-        dataIndex: 'percentChange',
-        key: 'percentChange',
-        width: 100,
-        render: (value: number) => (
-            <span style={{ color: value >= 0 ? 'green' : 'red' }}>{value}%</span>
-        ),
-    },
-    {
-        title: 'Time',
-        dataIndex: 'time',
-        key: 'time',
-        width: 150,
-    },
-    {
-        title: 'Volume',
-        dataIndex: 'volume',
-        key: 'volume',
-        width: 100,
-    },
-    {
-        title: 'OI',
-        dataIndex: 'oi',
-        key: 'oi',
-        width: 100,
-    },
-    {
-        title: 'Open',
-        dataIndex: 'open',
-        key: 'open',
-        width: 100,
-    },
-    {
-        title: 'High',
-        dataIndex: 'high',
-        key: 'high',
-        width: 100,
-    },
-    {
-        title: 'Low',
-        dataIndex: 'low',
-        key: 'low',
-        width: 100,
-    },
-    {
-        title: 'Prev. Cl',
-        dataIndex: 'prevClose',
-        key: 'prevClose',
-        width: 100,
-    },
-    {
-        title: 'Avg. Prc',
-        dataIndex: 'avgPrice',
-        key: 'avgPrice',
-        width: 100,
-    },
-    {
-        title: 'Ltq.',
-        dataIndex: 'ltq',
-        key: 'ltq',
-        width: 100,
-    },
-    {
-        title: 'Tot. B-Qty',
-        dataIndex: 'totalBuyQty',
-        key: 'totalBuyQty',
-        width: 100,
-    },
-    {
-        title: 'Tot. S-Qty',
-        dataIndex: 'totalSellQty',
-        key: 'totalSellQty',
-        width: 100,
-    },
-];
-
-const data = [
-    {
-        key: '1',
-        symbol: 'NIFTY_10-JUL-2025_CE_22300',
-        ltp: '102.45',
-        percentChange: 1.25,
-        time: '11:20:45',
-        volume: '10,200',
-        oi: '5,600',
-        open: '100.00',
-        high: '105.00',
-        low: '98.50',
-        prevClose: '101.00',
-        avgPrice: '102.00',
-        ltq: '250',
-        totalBuyQty: '6,500',
-        totalSellQty: '5,300',
-    },
-];
+const { Option } = Select;
 
 const MarketWatch: React.FC = () => {
-    return (
-        <SmartTable
-            title="Market Watch"
-            columns={columns}
-            dataSource={data}
-            rowKey="key"
-            searchable
-        />
-    );
+  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  // Dummy symbols (replace later with API)
+  const symbols: string[] = [
+    "NIFTY",
+    "BANKNIFTY",
+    "RELIANCE",
+    "TCS",
+  ];
+
+  const filteredSymbols =
+    searchText.length >= 2
+      ? symbols.filter((s) =>
+        s.toLowerCase().includes(searchText.toLowerCase())
+      )
+      : [];
+
+  const dropdownContent = (
+    <div
+      style={{
+        background: "#fff",
+        padding: 10,
+        width: 300,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        borderRadius: 4,
+      }}
+    >
+      <Select
+        showSearch
+        autoFocus
+        placeholder="Search symbol"
+        style={{ width: "100%" }}
+        value={searchText || undefined}
+        filterOption={false}
+        onSearch={(val) => setSearchText(val)}
+        notFoundContent={
+          searchText.length < 2
+            ? "Please enter 2 or more characters"
+            : "No symbol found"
+        }
+      >
+        {filteredSymbols.map((sym) => (
+          <Option key={sym} value={sym}>
+            {sym}
+          </Option>
+        ))}
+      </Select>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* Search & Add Symbol */}
+      <Row style={{ marginBottom: 12 }}>
+        <Col>
+          <Dropdown
+            open={open}
+            onOpenChange={(flag) => {
+              setOpen(flag);
+              if (!flag) {
+                setSearchText(""); // clear search when closed
+              }
+            }}
+            dropdownRender={() => dropdownContent}
+            trigger={["click"]}
+          >
+            <Button
+              type="primary"
+              icon={<DownOutlined />}
+              style={{
+                background: "#14b8a6",
+                borderColor: "#14b8a6",
+                height: 40,
+                fontSize: 14,
+                fontWeight: 500,
+                padding: "0 18px",
+              }}
+            >
+              Search & add symbol to the marketwatch
+            </Button>
+          </Dropdown>
+        </Col>
+      </Row>
+
+      <MarketWatchTable />
+    </div>
+  );
 };
 
 export default MarketWatch;
