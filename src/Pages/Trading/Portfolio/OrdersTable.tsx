@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Select } from "antd";
+import { Order } from "../../../Services/orderService";
 
 const { Option } = Select;
-
-const initialData: any[] = [];
 
 const columns = [
   {
@@ -40,6 +39,21 @@ const columns = [
     dataIndex: "updateTime",
     sorter: (a: any, b: any) =>
       String(a.updateTime).localeCompare(String(b.updateTime)),
+    render: (value: string) => {
+      if (!value) return "";
+
+      const date = new Date(value);
+
+      return date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+    }
   },
   {
     key: "status",
@@ -114,10 +128,10 @@ const columns = [
     sorter: (a: any, b: any) => Number(a.pendQty) - Number(b.pendQty),
   },
   {
-  key: "pubId",
-  title: "Pub Id",
-  dataIndex: "pubId",
-  sorter: (a: any, b: any) => String(a.pubId).localeCompare(String(b.pubId)),
+    key: "pubId",
+    title: "Pub Id",
+    dataIndex: "pubId",
+    sorter: (a: any, b: any) => String(a.pubId).localeCompare(String(b.pubId)),
   },
   {
     key: "avgPrc",
@@ -212,19 +226,46 @@ const columns = [
 
 ];
 
-const OrdersTable: React.FC = () => {
+interface OrdersTableProps {
+  orders: Order[];
+  loading: boolean;
+  selectedRowKeys: React.Key[];
+  setSelectedRowKeys: (keys: React.Key[]) => void;
+}
+
+const OrdersTable: React.FC<OrdersTableProps> = ({
+  orders,
+  loading,
+  selectedRowKeys,
+  setSelectedRowKeys
+}) => {
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => {
+      setSelectedRowKeys(keys);
+    }
+  };
+
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
-  const [filteredData, setFilteredData] = useState(initialData);
+  const [filteredData, setFilteredData] = useState<Order[]>([]);
+
+  // update table when backend data changes
+  useEffect(() => {
+    setFilteredData(orders);
+  }, [orders]);
 
   const handleColumnFilter = (value: string, key: string) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
 
-    let data = initialData;
+    let data = orders;
+
     Object.keys(newFilters).forEach((k) => {
       if (newFilters[k]) {
         data = data.filter((row: any) =>
-          String(row[k]).toLowerCase().includes(newFilters[k].toLowerCase())
+          String(row[k])
+            .toLowerCase()
+            .includes(newFilters[k].toLowerCase())
         );
       }
     });
@@ -234,7 +275,7 @@ const OrdersTable: React.FC = () => {
 
   const filterRow = (
     <tr>
-      {columns.map((col) => (
+      {columns.map((col: any) => (
         <th key={col.dataIndex}>
           <Select
             allowClear
@@ -251,9 +292,24 @@ const OrdersTable: React.FC = () => {
   return (
     <Table
       bordered
-      pagination={false}
+      rowKey="id"
+      rowSelection={rowSelection}
+      loading={loading}
+      pagination={{ pageSize: 20 }}
       columns={columns}
       dataSource={filteredData}
+      onRow={(record) => ({
+        onClick: () => {
+          const selected = [...selectedRowKeys];
+
+          if (selected.includes(record.id)) {
+            setSelectedRowKeys(selected.filter((key) => key !== record.id));
+          } else {
+            selected.push(record.id);
+            setSelectedRowKeys(selected);
+          }
+        },
+      })}
       scroll={{ x: "max-content" }}
       locale={{ emptyText: "" }}
       components={{
@@ -272,7 +328,10 @@ const OrdersTable: React.FC = () => {
                 <tr>
                   <td
                     colSpan={columns.length}
-                    style={{ textAlign: "center", fontWeight: "bold" }}
+                    style={{
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
                   >
                     No Data Available in table
                   </td>

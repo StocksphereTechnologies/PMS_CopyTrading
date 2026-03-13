@@ -9,27 +9,38 @@ import {
 
 const { Title, Text } = Typography;
 
-const MarginsAnalytics = ({ updateTime = "09:40:49 PM" }) => {
+interface MarginData {
+    total: number
+    utilized: number
+    available: number
+}
+
+interface Props {
+    data: MarginData
+    updateTime?: string
+}
+
+const MarginsAnalytics: React.FC<Props> = ({ data, updateTime }) => {
     const metrics = [
         {
             label: 'Total',
-            value: '₹0.46',
-            icon: <ShoppingOutlined style={{ fontSize: 28, color: 'rgba(255, 255, 255, 0.6)' }} />,
+            value: `₹${data.total}`,
+            icon: <ShoppingOutlined style={{ fontSize: 28, color: 'rgba(255,255,255,0.6)' }} />,
             bgColor: 'linear-gradient(to right, #00c9ff, #00e5e5)',
         },
         {
             label: 'Utilized',
-            value: '₹0.00',
-            icon: <LockOutlined style={{ fontSize: 28, color: 'rgba(255, 255, 255, 0.6)' }} />,
+            value: `₹${data.utilized}`,
+            icon: <LockOutlined style={{ fontSize: 28, color: 'rgba(255,255,255,0.6)' }} />,
             bgColor: '#ffa07a',
         },
         {
             label: 'Available',
-            value: '₹0.46',
-            icon: <TagOutlined style={{ fontSize: 28, color: 'rgba(255, 255, 255, 0.6)' }} />,
+            value: `₹${data.available}`,
+            icon: <TagOutlined style={{ fontSize: 28, color: 'rgba(255,255,255,0.6)' }} />,
             bgColor: 'linear-gradient(to right, #00e676, #00c853)',
         },
-    ];
+    ]
 
     return (
         <div>

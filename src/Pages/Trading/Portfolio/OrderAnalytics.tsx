@@ -4,14 +4,33 @@ import { ClockCircleOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
-const OrdersAnalyticsSummary = ({ title = "Orders Analytics", updateTime = "09:40:47 PM" }) => {
+interface OrdersAnalyticsData {
+    total: number
+    open: number
+    complete: number
+    trigPend: number
+    cancelled: number
+    rejected: number
+}
+
+interface Props {
+    data: OrdersAnalyticsData
+    title?: string
+    updateTime?: string
+}
+
+const OrdersAnalyticsSummary: React.FC<Props> = ({
+    data,
+    title = "Orders Analytics",
+    updateTime
+}) => {
     const statItems = [
-        { label: 'Total', value: 0 },
-        { label: 'Open', value: 0 },
-        { label: 'Complete', value: 0 },
-        { label: 'Trig-Pend', value: 0 },
-        { label: 'Cancelled', value: 0 },
-        { label: 'Rejected', value: 0 },
+        { label: 'Total', value: data.total },
+        { label: 'Open', value: data.open },
+        { label: 'Complete', value: data.complete },
+        { label: 'Trig-Pend', value: data.trigPend },
+        { label: 'Cancelled', value: data.cancelled },
+        { label: 'Rejected', value: data.rejected },
     ];
 
     return (

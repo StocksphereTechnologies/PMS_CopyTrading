@@ -7,11 +7,12 @@ from app.core.auth import get_current_user
 from app.models.user import User
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
 from app.schemas.margin import AccountMargin, MarginListResponse
+from app.schemas.order import OrderListResponse
 from app.services.account_service import AccountService
 from app.services.margin_service import MarginService
+from app.services.order_service import OrderService
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
-
 
 @router.get("/margins", response_model=MarginListResponse)
 async def get_margins(
@@ -25,6 +26,16 @@ async def get_margins(
         "total_accounts": len(margins)
     }
 
+@router.get("/orders", response_model=OrderListResponse)
+async def get_orders(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    orders = await OrderService.get_orders_for_user(db, current_user.user_id)
+    return {
+        "orders": orders,
+        "total_orders": len(orders)
+    }
 
 @router.get("/{account_id}/zerodha/login-url")
 async def get_zerodha_login_url(

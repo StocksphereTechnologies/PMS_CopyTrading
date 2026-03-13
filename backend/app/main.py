@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import accounts, positions, trades
+from app.api.routes import accounts, positions, trades, summary
 from app.api.endpoints import auth
 from app.core.database import engine, Base
 from contextlib import asynccontextmanager
@@ -37,9 +37,7 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(accounts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(positions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(trades.router, prefix=settings.API_V1_PREFIX)
-
-
-
+app.include_router(summary.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():

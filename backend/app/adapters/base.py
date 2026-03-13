@@ -55,3 +55,11 @@ class BrokerInterface(ABC):
         Returns list of position dictionaries
         """
         pass
+
+    @abstractmethod
+    async def get_orders(self) -> List[Dict]:
+        """
+        Fetch orders from broker
+        Returns list of order dictionaries
+        """
+        pass

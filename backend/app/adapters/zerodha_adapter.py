@@ -15,6 +15,17 @@ logger = logging.getLogger(__name__)
 class ZerodhaAdapter(BrokerInterface):
     """Zerodha Kite Connect API adapter"""
     
+    def parse_zerodha_time(self, ts):
+        if not ts:
+            return ""
+
+        try:
+            if isinstance(ts, str):
+                return ts
+            return ts.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return str(ts)
+    
     def __init__(self, account: Account, db: Optional[AsyncSession] = None):
         self.account = account
         self.db = db
@@ -139,7 +150,19 @@ class ZerodhaAdapter(BrokerInterface):
         except Exception as e:
             logger.error(f"Error fetching positions from Zerodha: {e}")
             return []
-    
+        
+    async def get_orders(self) -> List[Dict]:
+        """Fetch orders from Zerodha and transform to unified order format"""
+        try:
+            print(f"DEBUG: [Zerodha] Fetching real-time orders for account {self.account.account_id} ({self.account.trading_login_id})...", flush=True)
+            data = await self._make_request("GET", "/orders")
+            raw_orders = data.get("data", [])
+            print(f"DEBUG: [Zerodha] Orders fetched successfully ({len(raw_orders)} found) for account {self.account.account_id}.", flush=True)
+            return [self._map_order(o) for o in raw_orders]
+        except Exception as e:
+            logger.error(f"Error fetching orders from Zerodha: {e}")
+            return []
+       
     def _transform_margins(self, raw_margins: Dict[str, Any]) -> Dict[str, Any]:
         """Transform Zerodha margin response to unified format"""
         from datetime import datetime, timezone
@@ -222,6 +245,69 @@ class ZerodhaAdapter(BrokerInterface):
             last_updated=datetime.now(timezone.utc)
         )
     
+    def _map_order(self, order: Dict) -> Dict:
+        """Map Zerodha raw order to unified order schema"""
+        ts = order.get("order_timestamp")
+        update_time = self.parse_zerodha_time(ts)
+
+        product = order.get("product")
+        if product == "MIS":
+            product = "INTRADAY"
+        elif product == "CNC":
+            product = "DELIVERY"
+        elif product == "NRML":
+            product = "NORMAL"
+        else:
+            product = product or ""
+        
+        return {
+            "symbol": str(order.get("tradingsymbol") or ""),
+            "trdAcc": self.account.trading_login_id,
+            "pseAcc": self.account.nickname,
+    
+            "id": str(order.get("order_id") or ""),
+            "updateTime": str(update_time or ""),
+    
+            "status": order.get("status") or "",
+    
+            "qty": int(order.get("quantity") or 0),
+            "price": float(order.get("price") or 0),
+    
+            "variety": order.get("variety") or "",
+            "trade": str(order.get("transaction_type") or ""),
+            "order": str(order.get("order_type") or ""),
+            "product": product,    
+            "exch": str(order.get("exchange") or ""),
+            "trigPrc": float(order.get("trigger_price") or 0),
+    
+            "fillQty": int(order.get("filled_quantity") or 0),
+            "pendQty": int(order.get("pending_quantity") or 0),
+    
+            "pubId": "",
+            "avgPrc": float(order.get("average_price") or 0),
+    
+            "exchId": str(order.get("exchange_order_id") or ""),
+            "parentId": str(order.get("parent_order_id") or ""),
+    
+            "discQty": int(order.get("disclosed_quantity") or 0),
+    
+            "amo": order.get("variety", "").lower() == "amo",
+    
+            "validity": order.get("validity") or "DAY",
+            "rejectReason": order.get("status_message") or "",
+    
+            "brStatus": order.get("status") or "",
+            "brExch": str(order.get("exchange") or ""),
+            "brSymbol": order.get("tradingsymbol") or "",
+    
+            "day": "DAY",
+            "client": self.account.nickname,
+            "platform": "Kite",
+            "broker": "ZERODHA",
+    
+            "copyTrace": "",
+            "account_id": self.account.account_id
+    }   
     def normalize_symbol(self, symbol: str, exchange: str) -> str:
         """Normalize symbol for Zerodha (usually uppercase)"""
         return symbol.upper()
@@ -229,7 +315,6 @@ class ZerodhaAdapter(BrokerInterface):
     async def place_order(self, order_params: Dict) -> Dict:
         """Place order with Zerodha using Kite API"""
         try:
-            # Map product to Kite specific (MIS, CNC, NRML)
             product = order_params.get('product')
             if product == "INTRADAY": product = "MIS"
             elif product == "DELIVERY": product = "CNC"

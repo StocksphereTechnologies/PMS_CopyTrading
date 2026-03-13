@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, Typography } from 'antd';
-// import { Icon } from '@iconify/react'; // or use any AntD icon
 
 const { Title, Text } = Typography;
 
