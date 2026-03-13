@@ -411,7 +411,8 @@ const Trade: React.FC = () => {
             </Col>
 
             {/* Accounts */}
-            <Col span={8}>
+            
+            {/* <Col span={8}>
               <Form.Item 
                 label="Accounts" 
                 name="account_ids" 
@@ -431,8 +432,57 @@ const Trade: React.FC = () => {
                   ))}
                 </Select>
               </Form.Item>
-            </Col>
+            </Col> */}
+            
 
+            <Col span={8}>
+              <Form.Item
+                label="Accounts"
+                name="account_ids"
+                rules={[{ required: true, message: 'Select at least one account' }]}
+              >
+                <Select
+                  mode="multiple"
+                  size="large"
+                  placeholder="Select Accounts"
+                  loading={loadingAccounts}
+                  style={{ width: "100%" }}
+                  maxTagCount={3}
+                  maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
+                  dropdownStyle={{ maxHeight: 300, overflow: "auto" }}
+                  tagRender={(props) => {
+                    const { label, closable, onClose } = props;
+                    return (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          marginRight: 4,
+                          padding: "2px 6px",
+                          background: "#f0f0f0",
+                          borderRadius: 4,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {label}
+                        {closable && (
+                          <span onClick={onClose} style={{ marginLeft: 4, cursor: "pointer" }}>
+                            ×
+                          </span>
+                        )}
+                      </span>
+                    );
+                  }}
+                >
+                  {Array.isArray(accounts) &&
+                    accounts.map((acc) => (
+                      <Option key={acc.account_id} value={acc.account_id}>
+                        {acc.nickname || acc.trading_login_id} ({acc.broker_name})
+                      </Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            </Col>
             {/* BO Fields */}
             {orderType === 'BO' && (
               <>
