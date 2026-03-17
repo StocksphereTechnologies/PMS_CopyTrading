@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import asyncio
 from app.services.account_service import AccountService
 
-from app.api.routes import option_chain
+# from app.api.routes import option_chain
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize broker sessions for all enabled accounts
@@ -55,7 +55,7 @@ app.include_router(
     marketwatch.router,
     prefix=settings.API_V1_PREFIX
 )
-app.include_router(option_chain.router, prefix="/api/v1")
+# app.include_router(option_chain.router, prefix="/api/v1")
 app.include_router(group_router.router, prefix="/api/v1")
 
 @app.get("/")

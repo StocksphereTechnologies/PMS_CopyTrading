@@ -1,119 +1,96 @@
-# NOT WORKING WEBSOCKET ISSUES 
-"""
-Marketwatch API endpoints
-"""
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
-from datetime import datetime
-import asyncio
-import logging
+# """
+# ULTIMATE FIX: Marketwatch API endpoints (Using AsyncSessionLocal)
+# """
+# from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+# from typing import Optional, List
+# from datetime import datetime
+# import asyncio
+# import logging
 
-from app.api.dependencies import get_database
-from app.schemas.marketwatch import MarketwatchResponse
-from app.services.marketwatch_service import MarketwatchService
+# # Import the service and database session maker directly
+# from app.services.marketwatch_service import MarketwatchService
+# from app.core.database import AsyncSessionLocal
+# from app.schemas.marketwatch import MarketwatchResponse
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/marketwatch", tags=["marketwatch"])
+# router = APIRouter(
+#     prefix="/marketwatch",
+#     tags=["marketwatch"]
+# )
 
+# @router.get("/search", response_model=MarketwatchResponse)
+# async def search_symbols(
+#     q: str = Query(..., description="E.g. NIFTY26400"),
+#     exchange: Optional[str] = Query(None, description="NSE, BSE, or NFO"),
+# ):
+#     """
+#     Search symbols. Uses internal session to avoid 'Depends' issues.
+#     """
+#     async with AsyncSessionLocal() as db:
+#         service = MarketwatchService(db)
+#         instruments = await service.search_symbols(q, exchange)
+#         return MarketwatchResponse(
+#             instruments=instruments,
+#             total=len(instruments),
+#             timestamp=datetime.utcnow().isoformat()
+#         )
 
-@router.get("", response_model=MarketwatchResponse)
-async def get_marketwatch(
-    exchange: Optional[str] = Query(None, description="Filter by exchange (NSE, BSE, etc.)"),
-    db: AsyncSession = Depends(get_database)
-):
-    """
-    Get marketwatch instruments (symbol discovery only)
-    """
-    service = MarketwatchService(db)
-    instruments = await service.get_instruments(exchange)
+# @router.websocket("/ws")
+# async def websocket_marketwatch(websocket: WebSocket):
+#     """
+#     CRITICAL FIX: NO DEPENDENCIES (Depends) in this function.
+#     This prevents the 403 Forbidden error caused by missing Auth headers.
+#     """
+#     await websocket.accept()
+#     logger.info("WebSocket: Connection Accepted")
+    
+#     # Create the DB session manually inside the task
+#     async with AsyncSessionLocal() as db:
+#         service = MarketwatchService(db)
+#         subscribed_symbols = set()
 
-    return MarketwatchResponse(
-        instruments=instruments,
-        total=len(instruments),
-        timestamp=datetime.utcnow().isoformat()
-    )
+#         async def ticker_loop():
+#             try:
+#                 while True:
+#                     if subscribed_symbols:
+#                         instruments = await service.get_instruments(
+#                             symbols=list(subscribed_symbols)
+#                         )
+#                         if instruments:
+#                             await websocket.send_json({
+#                                 "type": "tick",
+#                                 "data": [inst.model_dump() for inst in instruments],
+#                                 "timestamp": datetime.utcnow().isoformat()
+#                             })
+#                     await asyncio.sleep(1)
+#             except Exception as e:
+#                 logger.debug(f"Ticker loop stopped: {e}")
 
+#         ticker_task = asyncio.create_task(ticker_loop())
 
-@router.get("/ltp/{symbol}")
-async def get_ltp(
-    symbol: str,
-    exchange: str = Query(..., description="Exchange name (NSE, BSE, etc.)"),
-    db: AsyncSession = Depends(get_database)
-):
-    """
-    Get Last Traded Price (LTP) for a symbol
-    """
-    service = MarketwatchService(db)
-    ltp = await service.get_ltp(symbol, exchange)
+#         try:
+#             while True:
+#                 data = await websocket.receive_json()
+#                 action = data.get("action")
+#                 symbols = data.get("symbols", [])
 
-    if ltp is None:
-        return {
-            "symbol": symbol,
-            "exchange": exchange,
-            "ltp": None,
-            "error": "LTP not available"
-        }
+#                 if action == "subscribe":
+#                     subscribed_symbols.update(symbols)
+#                 elif action == "unsubscribe":
+#                     for s in symbols:
+#                         subscribed_symbols.discard(s)
 
-    return {
-        "symbol": symbol,
-        "exchange": exchange,
-        "ltp": ltp
-    }
-
-
-@router.get("/normalize/{symbol}")
-async def normalize_symbol(
-    symbol: str,
-    exchange: str = Query(..., description="Exchange name (NSE, BSE, etc.)"),
-    db: AsyncSession = Depends(get_database)
-):
-    """
-    Normalize symbol across brokers
-    """
-    service = MarketwatchService(db)
-    normalized = await service.normalize_symbol(symbol, exchange)
-
-    return {
-        "symbol": symbol,
-        "exchange": exchange,
-        "broker_data": normalized
-    }
-
-
-@router.websocket("/ws")
-async def websocket_marketwatch(
-    websocket: WebSocket,
-    db: AsyncSession = Depends(get_database)
-):
-    """
-    WebSocket endpoint for real-time marketwatch updates
-    """
-    await websocket.accept()
-    logger.info("Marketwatch WebSocket connected")
-
-    service = MarketwatchService(db)
-
-    try:
-        while True:
-            instruments = await service.get_instruments()
-
-            await websocket.send_json({
-                "type": "marketwatch",
-                "data": [inst.model_dump() for inst in instruments],
-                "timestamp": datetime.utcnow().isoformat()
-            })
-
-            await asyncio.sleep(1)
-
-    except WebSocketDisconnect:
-        logger.info("Marketwatch WebSocket disconnected")
-
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await websocket.close()
-
+#         except WebSocketDisconnect:
+#             logger.info("WebSocket: Disconnected")
+#         except Exception as e:
+#             logger.error(f"WebSocket: Communication error: {e}")
+#         finally:
+#             ticker_task.cancel()
+#             try:
+#                 await websocket.close()
+#             except:
+#                 pass
 
 # """
 # Marketwatch API endpoints
