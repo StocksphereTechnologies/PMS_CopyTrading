@@ -21,8 +21,11 @@ import { InfoCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import tradeService from '../../../Services/tradeService';
 import { accountService, Account } from '../../../Services/accountService';
 import { notification, message as antMessage } from 'antd';
+import { groupService } from '../../../Services/groupService';
+
 
 const { Option } = Select;
+
 
 const Trade: React.FC = () => {
   const [form] = Form.useForm();
@@ -37,11 +40,17 @@ const Trade: React.FC = () => {
   const [isRecentModalOpen, setIsRecentModalOpen] = useState(false);
   const [recentSymbols, setRecentSymbols] = useState<
     { key: string; symbol: string; exch: string }[]
-  >([]); 
-
+  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const groupAcc = useWatch('groupAcc', form);
+  const [groups, setGroups] = useState<any[]>([]);
+  
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [tradeResults, setTradeResults] = useState<any[]>([]);
+  const [successCount, setSuccessCount] = useState(0);
+  const [failureCount, setFailureCount] = useState(0);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -64,6 +73,19 @@ const Trade: React.FC = () => {
     fetchAccounts();
   }, []);
 
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  const fetchGroups = async () => {
+    try {
+      const res = await groupService.getAll();
+      setGroups(res);
+    } catch (error) {
+      console.error("Failed to fetch groups");
+    }
+  };
+
   const handleSubmit = async (values: any) => {
     setSubmitting(true);
     try {
@@ -72,6 +94,27 @@ const Trade: React.FC = () => {
         return (isNaN(num) || num === 0) ? undefined : num;
       };
 
+      let selectedAccounts = values.account_ids;
+
+      if (values.groupAcc) {
+
+        const group = groups.find(
+          (g: any) => g.id === values.account_ids?.[0]
+        );
+
+        if (group) {
+          selectedAccounts = group.account_ids;
+        }
+
+      }
+
+      const payload = {
+        symbol: values.symbol,
+        side: values.side,
+        quantity: values.qty,
+        price: values.price,
+        account_ids: selectedAccounts
+      };
       const requestData = {
         symbol: values.symbol,
         exchange: values.exchange,
@@ -82,7 +125,7 @@ const Trade: React.FC = () => {
         trigger_price: values.priceType === 'STOP_LOSS' || values.priceType === 'SL_MARKET' ? cleanNumber(values.triggerPrice) : undefined,
         product: values.product,
         disclosed_quantity: cleanNumber(values.disclosedQty),
-        account_ids: values.account_ids,
+        account_ids: selectedAccounts,
         Target: cleanNumber(values.Target),
         Stoploss: cleanNumber(values.Stoploss),
         trailing_stoploss: cleanNumber(values['Trail. Stoploss']),
@@ -97,13 +140,27 @@ const Trade: React.FC = () => {
       };
 
       const result = await tradeService.placeTrade(requestData as any);
-      
-      notification.success({
-        message: 'Trade Executed',
-        description: `Successfully initiated trade for ${values.symbol} across ${values.account_ids?.length || 'all'} accounts.`,
-        placement: 'topRight'
-      });
-      
+
+      const executions = result.details || [];
+
+      const success = executions.filter((e: any) => e.status === "SUCCESS").length;
+      const failure = executions.filter((e: any) => e.status !== "SUCCESS").length;
+
+      setSuccessCount(success);
+      setFailureCount(failure);
+
+      const rows = executions.map((e: any, index: number) => ({
+        key: index,
+        account:
+          accounts.find(a => a.account_id === e.account_id)?.nickname ||
+          e.account_id,
+        orderId: e.status === "SUCCESS" ? e.order_id : e.error_reason,
+        status: e.status
+      }));
+
+      setTradeResults(rows);
+      setResultModalOpen(true);
+
       form.resetFields(['symbol', 'quantity', 'price', 'triggerPrice']);
     } catch (error: any) {
       notification.error({
@@ -200,6 +257,30 @@ const Trade: React.FC = () => {
     },
   ];
 
+  const resultColumns = [
+    {
+      title: "Account",
+      dataIndex: "account"
+    },
+    {
+      title: "Order ID",
+      dataIndex: "orderId",
+      render: (text: any, record: any) => (
+        <span style={{
+          color: record.status === "FAILED" ? "red" : "black"
+        }}>
+          {text}
+        </span>
+      )
+    },
+    {
+      title: "Help",
+      render: (_: any, record: any) =>
+        record.status === "FAILED" ? (
+          <a>Help Me</a>
+        ) : null
+    }
+  ];
   return (
     <div
       style={{
@@ -321,19 +402,19 @@ const Trade: React.FC = () => {
                 <Radio.Group size="small">
                   <Radio value="INTRADAY">INTRADAY</Radio>
                   <Tooltip title="Delivery position in STOCKS">
-                  <Radio value="DELIVERY" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    DELIVERY
-                  </Radio>
+                    <Radio value="DELIVERY" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      DELIVERY
+                    </Radio>
                   </Tooltip>
                   <Tooltip title="Carry forward positions in DERIVATIVES">
-                  <Radio value="NORMAL" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    NORMAL
-                  </Radio>
+                    <Radio value="NORMAL" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      NORMAL
+                    </Radio>
                   </Tooltip>
                   <Tooltip title="Margin Trading Facility(MTF)">
-                  <Radio value="MTF" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    MTF
-                  </Radio>
+                    <Radio value="MTF" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      MTF
+                    </Radio>
                   </Tooltip>
                 </Radio.Group>
               </Form.Item>
@@ -410,79 +491,39 @@ const Trade: React.FC = () => {
               </Form.Item>
             </Col>
 
-            {/* Accounts */}
-            
-            {/* <Col span={8}>
-              <Form.Item 
-                label="Accounts" 
-                name="account_ids" 
-                rules={[{ required: true, message: 'Select at least one account' }]}
-              >
-                <Select 
-                  mode="multiple" 
-                  size="large" 
-                  placeholder="Select Accounts"
-                  loading={loadingAccounts}
-                  maxTagCount="responsive"
-                >
-                  {Array.isArray(accounts) && accounts.map(acc => (
-                    <Option key={acc.account_id} value={acc.account_id}>
-                      {acc.nickname || acc.trading_login_id} ({acc.broker_name})
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col> */}
-            
+            {/* Accounts & Group's */}
 
             <Col span={8}>
               <Form.Item
-                label="Accounts"
+                label={groupAcc ? "Groups" : "Accounts"}
                 name="account_ids"
-                rules={[{ required: true, message: 'Select at least one account' }]}
+                rules={[{ required: true, message: "Select at least one account" }]}
               >
                 <Select
                   mode="multiple"
                   size="large"
-                  placeholder="Select Accounts"
-                  loading={loadingAccounts}
-                  style={{ width: "100%" }}
-                  maxTagCount={3}
-                  maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
-                  dropdownStyle={{ maxHeight: 300, overflow: "auto" }}
-                  tagRender={(props) => {
-                    const { label, closable, onClose } = props;
-                    return (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          marginRight: 4,
-                          padding: "2px 6px",
-                          background: "#f0f0f0",
-                          borderRadius: 4,
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        {label}
-                        {closable && (
-                          <span onClick={onClose} style={{ marginLeft: 4, cursor: "pointer" }}>
-                            ×
-                          </span>
-                        )}
-                      </span>
-                    );
-                  }}
+                  placeholder={groupAcc ? "Select Groups" : "Select Accounts"}
                 >
-                  {Array.isArray(accounts) &&
-                    accounts.map((acc) => (
+
+                  {/* SHOW GROUPS */}
+                  {groupAcc &&
+                    groups.map((grp: any) => (
+                      <Option key={grp.id} value={grp.id}>
+                        {grp.name} ({grp.totalAccounts} Accounts)
+                      </Option>
+                    ))}
+
+                  {/* SHOW ACCOUNTS */}
+                  {!groupAcc &&
+                    accounts.map((acc: any) => (
                       <Option key={acc.account_id} value={acc.account_id}>
-                        {acc.nickname || acc.trading_login_id} ({acc.broker_name})
+                        {acc.nickname || acc.account_name || acc.trading_login_id}
                       </Option>
                     ))}
                 </Select>
               </Form.Item>
             </Col>
+
             {/* BO Fields */}
             {orderType === 'BO' && (
               <>
@@ -567,10 +608,10 @@ const Trade: React.FC = () => {
               <Divider style={{ margin: '8px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Space>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    size="small" 
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    size="small"
                     danger={side === 'SELL'}
                     loading={submitting}
                   >
@@ -587,41 +628,37 @@ const Trade: React.FC = () => {
       </div>
 
       <Modal
-        title="Recent Symbols"
-        open={isRecentModalOpen}
-        onCancel={() => setIsRecentModalOpen(false)}
+        open={resultModalOpen}
         footer={[
           <Button
-            key="cancel"
+            key="ok"
             type="primary"
-            style={{ background: '#07b08a', borderColor: '#07b08a' }}
-            onClick={() => setIsRecentModalOpen(false)}
+            onClick={() => setResultModalOpen(false)}
           >
-            Cancel
-          </Button>,
+            OK
+          </Button>
         ]}
-        centered
+        onCancel={() => setResultModalOpen(false)}
         width={600}
-        maskClosable={false}
-        bodyStyle={{
-          minHeight: 400,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}
-      > 
-        <div style={{ flex: 1 }}>
-          <Table
-            columns={recentCols}
-            dataSource={recentSymbols}
-            pagination={false}
-            locale={{ emptyText: 'No data available in table' }}
-            rowKey="key"
-          />
-        </div>
-        <div style={{ textAlign: 'left', marginTop: 8 }}>
-          Showing 0 to 0 of 0 entries
-        </div>
+        centered
+      >
+
+        <h2 style={{ textAlign: "center" }}>
+          <span style={{ color: "#07b08a" }}>
+            Success: {successCount}
+          </span>
+          {" - "}
+          <span style={{ color: "red" }}>
+            Failure: {failureCount}
+          </span>
+        </h2>
+
+        <Table
+          columns={resultColumns}
+          dataSource={tradeResults}
+          pagination={false}
+        />
+
       </Modal>
 
     </div>

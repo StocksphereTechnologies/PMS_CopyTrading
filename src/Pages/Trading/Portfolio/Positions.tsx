@@ -6,11 +6,13 @@ import PositionTable from "./PositionTable";
 
 const { Option } = Select;
 
+
 const greyBtn = { background: "#6e6e6e", color: "#fff" };
 const orangeBtn = { background: "#ff8c5a", color: "#fff" };
 
 const Positions: React.FC = () => {
   const [positions, setPositions] = useState<any[]>([]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [searchText, setSearchText] = useState("");
   const [netType, setNetType] = useState("NET");
   const [openType, setOpenType] = useState("ALL");
@@ -19,6 +21,20 @@ const Positions: React.FC = () => {
   const parseCurrency = (val: any) =>
     parseFloat(String(val).replace(/[^0-9.-]+/g, "")) || 0;
 
+
+  const handleReset = () => {
+    setNetType("NET");
+    setOpenType("ALL");
+    setPositionType("ALL");
+    setSearchText("");
+  };
+  const handleSelect = () => {
+  setSelectedRowKeys(
+    positions
+      .filter(p => p.symbol?.toLowerCase().includes(searchText.toLowerCase()))
+      .map((p, i) => p.id || i)
+  );
+};
   return (
     <div style={{ padding: 24 }}>
       <Row gutter={10} align="middle" style={{ marginBottom: 10 }}>
@@ -62,17 +78,21 @@ const Positions: React.FC = () => {
 
         <Col>
           <Tooltip title="Reset position filters">
-            <Button style={greyBtn}>Reset</Button>
+            <Button style={greyBtn} onClick={handleReset}>Reset</Button>
           </Tooltip>
         </Col>
         <Col>
           <Tooltip title="Select all positions (if filtered, only filtered positions will be selected)">
-            <Button style={greyBtn}>Select</Button>
+            <Button style={greyBtn} onClick={handleSelect}>
+              Select
+            </Button>
           </Tooltip>
         </Col>
         <Col>
           <Tooltip title="Deselect all positions">
-            <Button style={greyBtn}>Deselect</Button>
+            <Button style={greyBtn} onClick={() => setSelectedRowKeys([])}>
+              Deselect
+            </Button>
           </Tooltip>
         </Col>
 

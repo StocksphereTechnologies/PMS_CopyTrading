@@ -21,6 +21,9 @@ import GroupAccounts from "./Pages/Settings/GroupAccounts/GroupAccounts";
 import CreateTradingAccount from "./Pages/Settings/TradingAccounts/CreateTradingAccount";
 import ValidateAll from './Pages/Settings/TradingAccounts/ValidateAll.tsx';
 import CreateGroupAccount from './Pages/Settings/GroupAccounts/CreateGroupAccount.tsx';
+import OptionChainTable from './Pages/OptionChainTable.tsx';
+
+
 
 const App: React.FC = () => {
 
@@ -55,7 +58,8 @@ const App: React.FC = () => {
                   <Route path="/settings/groupaccounts" element={<GroupAccounts />} />
                   <Route path="/settings/tradingaccounts/createtradingaccount" element={<CreateTradingAccount />} />
                   <Route path="/settings/tradingaccounts/validateall" element={<ValidateAll />} />
-                  <Route path="/settings/groupaccounts/creategroupaccount" element={<CreateGroupAccount />} />
+                  <Route path="/settings/groupaccounts/creategroupaccount/:id?" element={<CreateGroupAccount />} />
+                  <Route path="/trading/optionchain" element={<OptionChainTable />} />
                 </Routes>
               </div>
             </>

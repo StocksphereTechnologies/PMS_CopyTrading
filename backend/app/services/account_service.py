@@ -12,6 +12,7 @@ from app.services.login.zerodha_login_service import ZerodhaLoginService
 from app.services.login.fivepaisa_login_service import FivePaisaLoginService
 import logging
 import asyncio
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -508,26 +509,36 @@ class AccountService:
     
     @staticmethod
     async def delete_account(db: AsyncSession, account_id: int) -> bool:
-        """
-        Delete an account
-        
-        Args:
-            db: Database session
-            account_id: Account ID
-            
-        Returns:
-            True if deleted, False if not found
-        """
+
         account = await AccountService.get_account(db, account_id)
+
         if not account:
             return False
-        
-        await db.delete(account)
-        await db.commit()
-        
-        logger.info(f"Deleted account {account_id}")
-        return True
 
+        try:
+
+            await db.execute(
+                text("DELETE FROM group_accounts WHERE account_id = :id"),
+                {"id": account_id}
+            )
+            # delete related trades
+            await db.execute(
+                text("DELETE FROM trade_executions WHERE account_id = :id"),
+                {"id": account_id}
+            )
+
+            # delete account
+            await db.delete(account)
+
+            await db.commit()
+
+            logger.info(f"Deleted account {account_id}")
+            return True
+
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Delete failed: {e}")
+            return False
     @staticmethod
     async def get_zerodha_login_url(db: AsyncSession, account_id: int) -> str:
         """Get official login URL for Zerodha account"""

@@ -1,41 +1,44 @@
 import React, { useState, useEffect } from "react";
 import { Button, Input, Row, Col, Tooltip } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import GroupAccountsTable from "./GroupAccountsTable";
-import { useNavigate, useLocation } from "react-router-dom";
+import GroupsTable from "./GroupsTable";
+import { useNavigate } from "react-router-dom";
+import { groupService } from "../../../Services/groupService";
 
 const tealBtn = { background: "#0bb", color: "#fff" };
 
 interface GroupData {
+  id: number;
   key: number;
   name: string;
-  totalAccounts: number;
   multiplier: number;
   description: string;
+  totalAccounts: number;
 }
 
 const GroupAccounts: React.FC = () => {
+
   const [searchText, setSearchText] = useState("");
   const [groups, setGroups] = useState<GroupData[]>([]);
-
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
-    if (location.state?.newGroup) {
-      setGroups((prev) => [...prev, location.state.newGroup]);
-    }
-  }, [location.state]);
-  
-useEffect(() => {
-  const storedGroups = localStorage.getItem("groups");
+    fetchGroups();
+  }, []);
 
-  if (storedGroups) {
-    setGroups(JSON.parse(storedGroups));
-  }
-}, []);
+  const fetchGroups = async () => {
+    try {
+      const res = await groupService.getAll();
+      console.log("Groups API Response:", res);
+      setGroups(res);
+    } catch (error) {
+      console.error("Failed to fetch groups", error);
+    }
+  };
+
   return (
     <div style={{ padding: 16 }}>
+
       <h2>Group Accounts</h2>
 
       <p style={{ color: "#c45a00", marginBottom: 12 }}>
@@ -43,8 +46,9 @@ useEffect(() => {
       </p>
 
       <Row gutter={8} style={{ marginBottom: 12 }}>
+
         <Col>
-          <Tooltip title="Create a Trading Account.">
+          <Tooltip title="Create a Trading Account">
             <Button
               style={tealBtn}
               onClick={() =>
@@ -67,17 +71,105 @@ useEffect(() => {
             style={{ width: 220 }}
           />
         </Col>
+
       </Row>
 
-      <GroupAccountsTable
+      <GroupsTable
         searchText={searchText}
         data={groups}
       />
+
     </div>
   );
 };
 
 export default GroupAccounts;
+
+// import React, { useState, useEffect } from "react";
+// import { Button, Input, Row, Col, Tooltip } from "antd";
+// import { SearchOutlined } from "@ant-design/icons";
+// import GroupAccountsTable from "./GroupAccountsTable";
+// import { useNavigate } from "react-router-dom";
+// import { groupService } from "../../../services/group_service";
+
+// const tealBtn = { background: "#0bb", color: "#fff" };
+
+// interface GroupData {
+//   id: number;
+//   key: number;
+//   name: string;
+//   multiplier: number;
+//   description: string;
+//   totalAccounts: number;
+// }
+
+// const GroupAccounts: React.FC = () => {
+//   const [searchText, setSearchText] = useState("");
+//   const [groups, setGroups] = useState<GroupData[]>([]);
+//   const navigate = useNavigate();
+
+//   useEffect(() => {
+//     fetchGroups();
+//   }, []);
+
+//   const fetchGroups = async () => {
+//     try {
+//       const res = await groupService.getAll();
+
+//       console.log("Groups API Response:", res); // helpful for debugging
+
+//       setGroups(res); // service already formats data correctly
+//     } catch (error) {
+//       console.error("Failed to fetch groups", error);
+//     }
+//   };
+
+//   return (
+//     <div style={{ padding: 16 }}>
+//       <h2>Group Accounts</h2>
+
+//       <p style={{ color: "#c45a00", marginBottom: 12 }}>
+//         A list of all your group accounts configured with AutoTrader
+//       </p>
+
+//       <Row gutter={8} style={{ marginBottom: 12 }}>
+//         <Col>
+//           <Tooltip title="Create a Trading Account.">
+//             <Button
+//               style={tealBtn}
+//               onClick={() =>
+//                 navigate("/settings/groupaccounts/creategroupaccount")
+//               }
+//             >
+//               Create
+//             </Button>
+//           </Tooltip>
+//         </Col>
+
+//         <Col flex="auto" />
+
+//         <Col>
+//           <Input
+//             prefix={<SearchOutlined />}
+//             placeholder="Search"
+//             value={searchText}
+//             onChange={(e) => setSearchText(e.target.value)}
+//             style={{ width: 220 }}
+//           />
+//         </Col>
+//       </Row>
+
+//       <GroupAccountsTable
+//         searchText={searchText}
+//         data={groups}
+//       />
+//     </div>
+//   );
+// };
+
+// export default GroupAccounts;
+
+
 
 // import React, { useState } from "react";
 // import { Button, Input, Row, Col, Tooltip } from "antd";
