@@ -12,7 +12,7 @@ import { accountService } from "../../../Services/accountService";
 interface TableData {
   key: number;
   account_id: number;
-  pseudoAcc: string;
+  nickname: string;
   tradingAcc: string;
   broker: string;
   live: string;
@@ -20,9 +20,10 @@ interface TableData {
 
 interface Props {
   onAddAccount: (account: TableData) => void;
+  selectedAccountIds: number[];
 }
 
-const AvailablePseudoAccountsTable: React.FC<Props> = ({ onAddAccount }) => {
+const AvailableAccountsTable: React.FC<Props> = ({ onAddAccount, selectedAccountIds }) => {
   const { accounts, setAccounts } = useAccountStore();
 
   useEffect(() => {
@@ -41,7 +42,7 @@ const AvailablePseudoAccountsTable: React.FC<Props> = ({ onAddAccount }) => {
   const handleAdd = (account: TableData) => {
     onAddAccount(account);
   };
-
+  
   const columns = [
     {
       title: "Add",
@@ -58,10 +59,10 @@ const AvailablePseudoAccountsTable: React.FC<Props> = ({ onAddAccount }) => {
       ),
     },
     {
-      title: "Pseudo Acc",
-      dataIndex: "pseudoAcc",
+      title: "Nickname",
+      dataIndex: "nickname",
       sorter: (a: TableData, b: TableData) =>
-        a.pseudoAcc.localeCompare(b.pseudoAcc),
+        a.nickname.localeCompare(b.nickname),
     },
     {
       title: "Trading Acc",
@@ -83,15 +84,16 @@ const AvailablePseudoAccountsTable: React.FC<Props> = ({ onAddAccount }) => {
     },
   ];
 
-  const tableData: TableData[] = accounts.map((account: any) => ({
+  const tableData: TableData[] = accounts
+  .filter((account: any) => !selectedAccountIds.includes(account.account_id))
+  .map((account: any) => ({
     key: account.account_id,
     account_id: account.account_id,
-    pseudoAcc: account.nickname || "N/A",
+    nickname: account.nickname,
     tradingAcc: account.trading_login_id,
     broker: account.broker_name,
     live: account.is_enabled ? "Yes" : "No",
   }));
-
   return (
     <>
       <div style={{ textAlign: "right", marginBottom: 8 }}>
@@ -115,4 +117,4 @@ const AvailablePseudoAccountsTable: React.FC<Props> = ({ onAddAccount }) => {
   );
 };
 
-export default AvailablePseudoAccountsTable;
+export default AvailableAccountsTable;

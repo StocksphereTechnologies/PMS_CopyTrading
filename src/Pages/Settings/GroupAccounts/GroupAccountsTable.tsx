@@ -1,146 +1,93 @@
 import React from "react";
-import { Table } from "antd";
+import { Table, Input, Button, Tag } from "antd";
+import {
+  SearchOutlined,
+  DeleteOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+} from "@ant-design/icons";
 
-interface GroupData {
+interface TableData {
   key: number;
-  name: string;
-  totalAccounts: number;
-  multiplier: number;
-  description: string;
+  account_id: number;
+  nickname: string;
+  tradingAcc: string;
+  broker: string;
+  live: string;
 }
-
-const columns = [
-  {
-    title: "Name",
-    dataIndex: "name",
-    sorter: (a: GroupData, b: GroupData) =>
-      a.name.localeCompare(b.name),
-  },
-  {
-    title: "Total Accounts",
-    dataIndex: "totalAccounts",
-    sorter: (a: GroupData, b: GroupData) =>
-      a.totalAccounts - b.totalAccounts,
-  },
-  {
-    title: "Multiplier",
-    dataIndex: "multiplier",
-    sorter: (a: GroupData, b: GroupData) =>
-      a.multiplier - b.multiplier,
-  },
-  {
-    title: "Description",
-    dataIndex: "description",
-    sorter: (a: GroupData, b: GroupData) =>
-      a.description.localeCompare(b.description),
-  },
-];
 
 interface Props {
-  searchText: string;
-  data: GroupData[];
+  accounts: TableData[];
+  onRemoveAccount: (accountId: number) => void;
 }
 
-const GroupAccountsTable: React.FC<Props> = ({ searchText, data }) => {
-
-  const filteredData = searchText
-    ? data.filter((row) =>
-        Object.values(row).some((value) =>
-          String(value).toLowerCase().includes(searchText.toLowerCase())
-        )
-      )
-    : data;
+const GroupAccountsTable: React.FC<Props> = ({
+  accounts,
+  onRemoveAccount,
+  }) => {
+  const columns = [
+    {
+      title: "Remove",
+      key: "remove",
+      render: (_: any, record: TableData) => (
+        <Button
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => onRemoveAccount(record.account_id)}
+        >
+          Remove
+        </Button>
+      ),
+    },
+    {
+      title: "Nickname",
+      dataIndex: "nickname",
+    },
+    {
+      title: "Trading Acc",
+      dataIndex: "tradingAcc",
+    },
+    {
+      title: "Broker",
+      dataIndex: "broker",
+    },
+    {
+      title: "Live",
+      dataIndex: "live",
+      render: (live: string) => (
+        <Tag color={live === "Yes" ? "green" : "orange"}>
+          {live === "Yes" ? <CheckCircleOutlined /> : <CloseCircleOutlined />}{" "}
+          {live}
+        </Tag>
+      ),
+    },
+  ];
 
   return (
-    <Table
-      bordered
-      pagination={false}
-      columns={columns}
-      dataSource={filteredData}
-      rowKey="key"
-      locale={{ emptyText: "No data available in table" }}
-    />
+    <>
+      <div style={{ textAlign: "right", marginBottom: 8 }}>
+        <Input
+          prefix={<SearchOutlined />}
+          placeholder="Search"
+          style={{ width: 220 }}
+        />
+      </div>
+
+      <Table
+        bordered
+        pagination={{ pageSize: 10 }}
+        columns={columns}
+        dataSource={accounts}
+        rowKey="account_id"
+        locale={{ emptyText: "No accounts added to group" }}
+      />
+
+      <p style={{ marginTop: 8 }}>
+        Showing {accounts.length} entries
+      </p>
+    </>
   );
 };
 
 export default GroupAccountsTable;
-
-// import React, { useState } from "react";
-// import { Table } from "antd";
-
-// const initialData: any[] = [];
-
-// const columns = [
-//   {
-//     title: "Name",
-//     dataIndex: "name",
-//     sorter: (a: any, b: any) =>
-//       String(a.name).localeCompare(String(b.name)),
-//   },
-//   {
-//     title: "Total Accounts",
-//     dataIndex: "totalAccounts",
-//     sorter: (a: any, b: any) =>
-//       Number(a.totalAccounts) - Number(b.totalAccounts),
-//   },
-//   {
-//     title: "Multiplier",
-//     dataIndex: "multiplier",
-//     sorter: (a: any, b: any) =>
-//       Number(a.multiplier) - Number(b.multiplier),
-//   },
-//   {
-//     title: "Description",
-//     dataIndex: "description",
-//     sorter: (a: any, b: any) =>
-//       String(a.description).localeCompare(String(b.description)),
-//   },
-// ];
-
-// const GroupAccountsTable: React.FC<{ searchText: string }> = ({ searchText }) => {
-//   const [data] = useState(initialData);
-
-//   const filteredData = searchText
-//     ? data.filter((row: any) =>
-//         Object.values(row).some((v: any) =>
-//           String(v).toLowerCase().includes(searchText.toLowerCase())
-//         )
-//       )
-//     : data;
-
-//   return (
-//     <Table
-//       bordered
-//       pagination={false}
-//       columns={columns}
-//       dataSource={filteredData}
-//       locale={{ emptyText: "" }}
-//       components={{
-//         body: {
-//           wrapper: (props: any) =>
-//             filteredData.length === 0 ? (
-//               <tbody>
-//                 <tr>
-//                   <td
-//                     colSpan={columns.length}
-//                     style={{
-//                       textAlign: "center",
-//                       fontWeight: "bold",
-//                       padding: "12px",
-//                       borderBottom: "1px solid #d9d9d9",
-//                     }}
-//                   >
-//                     No data available in table
-//                   </td>
-//                 </tr>
-//               </tbody>
-//             ) : (
-//               <tbody {...props} />
-//             ),
-//         },
-//       }}
-//     />
-//   );
-// };
-
-// export default GroupAccountsTable;

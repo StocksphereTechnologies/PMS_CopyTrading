@@ -20,7 +20,10 @@ import { useWatch } from 'antd/es/form/Form';
 import { InfoCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import tradeService from '../../../Services/tradeService';
 import { accountService, Account } from '../../../Services/accountService';
-import { notification, message as antMessage } from 'antd';
+import { notification } from 'antd';
+import { groupService } from '../../../Services/groupService';
+import Swal from "sweetalert2";
+import { useLocation } from "react-router-dom";
 
 const { Option } = Select;
 
@@ -32,16 +35,30 @@ const Trade: React.FC = () => {
   const priceType = useWatch('priceType', form);
   const splitType = useWatch('split', form);
 
+  const [selectedAccountsWithQty, setSelectedAccountsWithQty] = useState<any[]>([]);
+
+  const diffQty = useWatch('diffQty', form);
   const [disablePrice, setDisablePrice] = useState(false);
   const [disableTrigPrice, setDisableTrigPrice] = useState(false);
   const [isRecentModalOpen, setIsRecentModalOpen] = useState(false);
   const [recentSymbols, setRecentSymbols] = useState<
     { key: string; symbol: string; exch: string }[]
-  >([]); 
-
+  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const groupAcc = useWatch('groupAcc', form);
+  const [groups, setGroups] = useState<any[]>([]);
+
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [tradeResults, setTradeResults] = useState<any[]>([]);
+  const [successCount, setSuccessCount] = useState(0);
+  const [failureCount, setFailureCount] = useState(0);
+
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [diffQtyError, setDiffQtyError] = useState<string>("");
+
+  const location = useLocation();
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -64,6 +81,32 @@ const Trade: React.FC = () => {
     fetchAccounts();
   }, []);
 
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  useEffect(() => {
+    if (location.state) {
+      form.setFieldsValue({
+        symbol: location.state.symbol,
+        exchange: location.state.exchange,
+        side: location.state.side,
+        price: location.state.price,
+        quantity: location.state.quantity,
+        scrip_code: location.state.scrip_code,
+      });
+    }
+  }, [location.state]);
+
+  const fetchGroups = async () => {
+    try {
+      const res = await groupService.getAll();
+      setGroups(res);
+    } catch (error) {
+      console.error("Failed to fetch groups");
+    }
+  };
+
   const handleSubmit = async (values: any) => {
     setSubmitting(true);
     try {
@@ -72,9 +115,44 @@ const Trade: React.FC = () => {
         return (isNaN(num) || num === 0) ? undefined : num;
       };
 
+      let selectedAccounts = values.account_ids;
+
+      if (values.groupAcc) {
+
+        const group = groups.find(
+          (g: any) => g.id === values.account_ids?.[0]
+        );
+
+      }
+
+      if (values.diffQty) {
+        const isEmptySelection =
+          !selectedAccountsWithQty || selectedAccountsWithQty.length === 0;
+
+        if (isEmptySelection) {
+
+          const message = values.groupAcc
+            ? "Quantity calculation failed: No groups selected"
+            : "Quantity calculation failed: No accounts selected";
+
+          setDiffQtyError(message);
+
+          await Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: message,
+            confirmButtonText: "OK"
+          });
+
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const requestData = {
         symbol: values.symbol,
         exchange: values.exchange,
+        scrip_code: values.scrip_code,
         side: values.side,
         quantity: Number(values.quantity),
         order_type: values.priceType === 'MARKET' ? 'MARKET' : (values.priceType === 'LIMIT' ? 'LIMIT' : (values.priceType === 'STOP_LOSS' ? 'SL' : 'SL_M')),
@@ -82,7 +160,15 @@ const Trade: React.FC = () => {
         trigger_price: values.priceType === 'STOP_LOSS' || values.priceType === 'SL_MARKET' ? cleanNumber(values.triggerPrice) : undefined,
         product: values.product,
         disclosed_quantity: cleanNumber(values.disclosedQty),
-        account_ids: values.account_ids,
+        account_ids: values.diffQty ? undefined : selectedAccounts,
+        accounts_with_qty: values.diffQty
+          ? selectedAccountsWithQty.map((item) => ({
+            ...(groupAcc
+              ? { group_id: item.id }
+              : { account_id: item.account_id }),
+            quantity: item.quantity || 1,
+          }))
+          : undefined,
         Target: cleanNumber(values.Target),
         Stoploss: cleanNumber(values.Stoploss),
         trailing_stoploss: cleanNumber(values['Trail. Stoploss']),
@@ -97,13 +183,27 @@ const Trade: React.FC = () => {
       };
 
       const result = await tradeService.placeTrade(requestData as any);
-      
-      notification.success({
-        message: 'Trade Executed',
-        description: `Successfully initiated trade for ${values.symbol} across ${values.account_ids?.length || 'all'} accounts.`,
-        placement: 'topRight'
-      });
-      
+
+      const executions = result.details || [];
+
+      const success = executions.filter((e: any) => e.status === "SUCCESS").length;
+      const failure = executions.filter((e: any) => e.status !== "SUCCESS").length;
+
+      setSuccessCount(success);
+      setFailureCount(failure);
+
+      const rows = executions.map((e: any, index: number) => ({
+        key: index,
+        account:
+          accounts.find(a => a.account_id === e.account_id)?.nickname ||
+          e.account_id,
+        orderId: e.status === "SUCCESS" ? e.order_id : e.error_reason,
+        status: e.status
+      }));
+
+      setTradeResults(rows);
+      setResultModalOpen(true);
+
       form.resetFields(['symbol', 'quantity', 'price', 'triggerPrice']);
     } catch (error: any) {
       notification.error({
@@ -119,6 +219,14 @@ const Trade: React.FC = () => {
   const handleReset = () => {
     form.resetFields();
   };
+
+  useEffect(() => {
+    if (!diffQty) {
+      setSelectedAccountsWithQty([]);
+      setSelectedRowKeys([]);
+      setDiffQtyError("");
+    }
+  }, [diffQty, groupAcc]);
 
   useEffect(() => {
     let priceDisabled = false;
@@ -200,6 +308,30 @@ const Trade: React.FC = () => {
     },
   ];
 
+  const resultColumns = [
+    {
+      title: "Account",
+      dataIndex: "account"
+    },
+    {
+      title: "Order ID",
+      dataIndex: "orderId",
+      render: (text: any, record: any) => (
+        <span style={{
+          color: record.status === "FAILED" ? "red" : "black"
+        }}>
+          {text}
+        </span>
+      )
+    },
+    {
+      title: "Help",
+      render: (_: any, record: any) =>
+        record.status === "FAILED" ? (
+          <a>Help Me</a>
+        ) : null
+    }
+  ];
   return (
     <div
       style={{
@@ -292,6 +424,7 @@ const Trade: React.FC = () => {
                   <Option value="NSE">NSE</Option>
                   <Option value="BSE">BSE</Option>
                   <Option value="MCX">MCX</Option>
+                  <Option value="NFO">NFO</Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -321,19 +454,19 @@ const Trade: React.FC = () => {
                 <Radio.Group size="small">
                   <Radio value="INTRADAY">INTRADAY</Radio>
                   <Tooltip title="Delivery position in STOCKS">
-                  <Radio value="DELIVERY" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    DELIVERY
-                  </Radio>
+                    <Radio value="DELIVERY" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      DELIVERY
+                    </Radio>
                   </Tooltip>
                   <Tooltip title="Carry forward positions in DERIVATIVES">
-                  <Radio value="NORMAL" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    NORMAL
-                  </Radio>
+                    <Radio value="NORMAL" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      NORMAL
+                    </Radio>
                   </Tooltip>
                   <Tooltip title="Margin Trading Facility(MTF)">
-                  <Radio value="MTF" disabled={orderType === 'CO' || orderType === 'BO'}>
-                    MTF
-                  </Radio>
+                    <Radio value="MTF" disabled={orderType === 'CO' || orderType === 'BO'}>
+                      MTF
+                    </Radio>
                   </Tooltip>
                 </Radio.Group>
               </Form.Item>
@@ -410,79 +543,38 @@ const Trade: React.FC = () => {
               </Form.Item>
             </Col>
 
-            {/* Accounts */}
-            
-            {/* <Col span={8}>
-              <Form.Item 
-                label="Accounts" 
-                name="account_ids" 
-                rules={[{ required: true, message: 'Select at least one account' }]}
-              >
-                <Select 
-                  mode="multiple" 
-                  size="large" 
-                  placeholder="Select Accounts"
-                  loading={loadingAccounts}
-                  maxTagCount="responsive"
-                >
-                  {Array.isArray(accounts) && accounts.map(acc => (
-                    <Option key={acc.account_id} value={acc.account_id}>
-                      {acc.nickname || acc.trading_login_id} ({acc.broker_name})
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col> */}
-            
+            {/* Accounts & Group's */}
 
-            <Col span={8}>
-              <Form.Item
-                label="Accounts"
-                name="account_ids"
-                rules={[{ required: true, message: 'Select at least one account' }]}
-              >
-                <Select
-                  mode="multiple"
-                  size="large"
-                  placeholder="Select Accounts"
-                  loading={loadingAccounts}
-                  style={{ width: "100%" }}
-                  maxTagCount={3}
-                  maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
-                  dropdownStyle={{ maxHeight: 300, overflow: "auto" }}
-                  tagRender={(props) => {
-                    const { label, closable, onClose } = props;
-                    return (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          marginRight: 4,
-                          padding: "2px 6px",
-                          background: "#f0f0f0",
-                          borderRadius: 4,
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        {label}
-                        {closable && (
-                          <span onClick={onClose} style={{ marginLeft: 4, cursor: "pointer" }}>
-                            ×
-                          </span>
-                        )}
-                      </span>
-                    );
-                  }}
+            {!diffQty && (
+              <Col span={8}>
+                <Form.Item
+                  label={groupAcc ? "Groups" : "Accounts"}
+                  name="account_ids"
+                  rules={[{ required: true, message: "Select at least one account" }]}
                 >
-                  {Array.isArray(accounts) &&
-                    accounts.map((acc) => (
-                      <Option key={acc.account_id} value={acc.account_id}>
-                        {acc.nickname || acc.trading_login_id} ({acc.broker_name})
-                      </Option>
-                    ))}
-                </Select>
-              </Form.Item>
-            </Col>
+                  <Select
+                    mode="multiple"
+                    size="large"
+                    placeholder={groupAcc ? "Select Groups" : "Select Accounts"}
+                  >
+                    {groupAcc &&
+                      groups.map((grp: any) => (
+                        <Option key={grp.id} value={grp.id}>
+                          {grp.name} ({grp.totalAccounts} Accounts)
+                        </Option>
+                      ))}
+
+                    {!groupAcc &&
+                      accounts.map((acc: any) => (
+                        <Option key={acc.account_id} value={acc.account_id}>
+                          {acc.nickname || acc.account_name || acc.trading_login_id}
+                        </Option>
+                      ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
+
             {/* BO Fields */}
             {orderType === 'BO' && (
               <>
@@ -524,6 +616,7 @@ const Trade: React.FC = () => {
             </Col>
 
             {/* Switches */}
+
             <Col span={4}>
               <Form.Item label="Group Acc" name="groupAcc" valuePropName="checked">
                 <Switch style={{ transform: 'scale(1.5)' }} />
@@ -562,15 +655,78 @@ const Trade: React.FC = () => {
               )}
             </Col>
 
+            {/* Diff Qty Table */}
+            {diffQty && (
+              <Col span={24}>
+                <Table
+                  rowKey={groupAcc ? "id" : "account_id"}
+                  dataSource={groupAcc ? groups : accounts}
+                  loading={loadingAccounts}
+                  pagination={false}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: (keys, rows) => {
+                      setSelectedRowKeys(keys);
+
+                      setSelectedAccountsWithQty(
+                        rows.map((r: any) => ({
+                          quantity: 1,
+                          ...(groupAcc
+                            ? { id: r.id }               // ✅ group
+                            : { account_id: r.account_id }) // ✅ account
+                        }))
+                      );
+                    },
+                  }}
+                  columns={[
+                    {
+                      title: "Account",
+                      dataIndex: "nickname",
+                      render: (_: any, record: any) =>
+                        groupAcc
+                          ? record.name
+                          : record.nickname || record.account_name || record.trading_login_id,
+                    },
+                    {
+                      title: "Quantity",
+                      render: (_: any, record: any) => (
+                        <InputNumber
+                          min={1}
+                          value={
+                            selectedAccountsWithQty.find((item) =>
+                              groupAcc
+                                ? item.id === record.id
+                                : item.account_id === record.account_id
+                            )?.quantity || 1
+                          }
+                          onChange={(val) => {
+                            setSelectedAccountsWithQty((prev) =>
+                              prev.map((item) =>
+                                groupAcc
+                                  ? item.id === record.id
+                                  : item.account_id === record.account_id
+                                    ? { ...item, quantity: val }
+                                    : item
+                              )
+                            );
+                          }}
+                        />
+                      ),
+                    },
+                  ]}
+                />
+              </Col>
+            )}
+
             {/* Buttons */}
             <Col span={24}>
               <Divider style={{ margin: '8px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Space>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    size="small" 
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    size="small"
                     danger={side === 'SELL'}
                     loading={submitting}
                   >
@@ -587,41 +743,37 @@ const Trade: React.FC = () => {
       </div>
 
       <Modal
-        title="Recent Symbols"
-        open={isRecentModalOpen}
-        onCancel={() => setIsRecentModalOpen(false)}
+        open={resultModalOpen}
         footer={[
           <Button
-            key="cancel"
+            key="ok"
             type="primary"
-            style={{ background: '#07b08a', borderColor: '#07b08a' }}
-            onClick={() => setIsRecentModalOpen(false)}
+            onClick={() => setResultModalOpen(false)}
           >
-            Cancel
-          </Button>,
+            OK
+          </Button>
         ]}
-        centered
+        onCancel={() => setResultModalOpen(false)}
         width={600}
-        maskClosable={false}
-        bodyStyle={{
-          minHeight: 400,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}
-      > 
-        <div style={{ flex: 1 }}>
-          <Table
-            columns={recentCols}
-            dataSource={recentSymbols}
-            pagination={false}
-            locale={{ emptyText: 'No data available in table' }}
-            rowKey="key"
-          />
-        </div>
-        <div style={{ textAlign: 'left', marginTop: 8 }}>
-          Showing 0 to 0 of 0 entries
-        </div>
+        centered
+      >
+
+        <h2 style={{ textAlign: "center" }}>
+          <span style={{ color: "#07b08a" }}>
+            Success: {successCount}
+          </span>
+          {" - "}
+          <span style={{ color: "red" }}>
+            Failure: {failureCount}
+          </span>
+        </h2>
+
+        <Table
+          columns={resultColumns}
+          dataSource={tradeResults}
+          pagination={false}
+        />
+
       </Modal>
 
     </div>

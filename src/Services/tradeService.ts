@@ -1,4 +1,3 @@
-
 import api from './api';
 
 export interface TradeOrderRequest {
@@ -39,9 +38,8 @@ export interface TradeResponse {
   trade_id: number;
   symbol: string;
   side: string;
-  executions: TradeExecution[];
+  details: TradeExecution[];
 }
-
 const tradeService = {
   placeTrade: async (order: TradeOrderRequest): Promise<TradeResponse> => {
     const response = await api.post('/trades', order);

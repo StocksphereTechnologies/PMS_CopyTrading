@@ -45,6 +45,19 @@ class ZerodhaAdapter(BrokerInterface):
             
         self.base_url = settings.ZERODHA_API_BASE_URL
         self.api_url = self.base_url  # usually https://api.kite.trade
+
+    async def get_lot_size(self, symbol: str, exchange: str) -> int:
+        try:
+            instruments = await self.get_instruments(exchange)
+
+            for inst in instruments:
+                if inst.get("tradingsymbol") == symbol:
+                    return int(inst.get("lot_size", 1))
+
+            return 1
+        except Exception as e:
+            logger.error(f"Lot size fetch error: {e}")
+            return 1
     
     async def _make_request(
         self,
@@ -162,6 +175,8 @@ class ZerodhaAdapter(BrokerInterface):
         except Exception as e:
             logger.error(f"Error fetching orders from Zerodha: {e}")
             return []
+    
+    
        
     def _transform_margins(self, raw_margins: Dict[str, Any]) -> Dict[str, Any]:
         """Transform Zerodha margin response to unified format"""
@@ -308,9 +323,28 @@ class ZerodhaAdapter(BrokerInterface):
             "copyTrace": "",
             "account_id": self.account.account_id
     }   
+
+    def convert_to_zerodha_symbol(self, symbol: str) -> str:
+        try:
+            parts = symbol.split()
+            if len(parts) >= 4: 
+                underlying = parts[0]
+                expiry = parts[1]     
+                strike = parts[2]
+                option_type = parts[3]
+                day = expiry[:2]    
+                month = expiry[2:5]
+                year = expiry[5:]
+                return f"{underlying}{year}{month}{strike}{option_type}"
+            return symbol   
+        except Exception:
+            return symbol
+
+
     def normalize_symbol(self, symbol: str, exchange: str) -> str:
         """Normalize symbol for Zerodha (usually uppercase)"""
         return symbol.upper()
+    
     
     async def place_order(self, order_params: Dict) -> Dict:
         """Place order with Zerodha using Kite API"""
@@ -324,12 +358,18 @@ class ZerodhaAdapter(BrokerInterface):
             order_type = order_params.get("order_type")
             if order_type == "SL_MARKET": order_type = "SL-M"
             
+            raw_symbol = order_params.get("tradingsymbol")
+            tradingsymbol = self.convert_to_zerodha_symbol(raw_symbol)
+
+            lot_size = await self.get_lot_size(tradingsymbol, order_params.get("exchange"))
+            final_qty = int(order_params.get("quantity", 1)) * lot_size
+
             # Prepare data for Kite API
             data = {
                 "exchange": order_params.get("exchange"),
-                "tradingsymbol": order_params.get("tradingsymbol"),
+                "tradingsymbol": tradingsymbol,
                 "transaction_type": order_params.get("transaction_type"),
-                "quantity": int(order_params.get("quantity", 0)),
+                "quantity": final_qty,
                 "order_type": order_type,
                 "product": product,
                 "validity": order_params.get("validity", "DAY"),
@@ -339,6 +379,8 @@ class ZerodhaAdapter(BrokerInterface):
                 "tag": order_params.get("tag")
             }
             
+            logger.info(f"ZERODHA SYMBOL: {raw_symbol} → {tradingsymbol}")
+
             # Map Variety (regular, bo, co, amo)
             variety = order_params.get("variety", "regular").lower()
             if order_params.get("is_amo"):
@@ -375,3 +417,5 @@ class ZerodhaAdapter(BrokerInterface):
                 "status": "FAILED",
                 "error": str(e)
             }
+        
+

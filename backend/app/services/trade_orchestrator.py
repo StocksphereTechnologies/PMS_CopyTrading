@@ -15,6 +15,7 @@ from app.adapters.fivepaisa_adapter import FivePaisaAdapter
 from app.schemas.trade import TradeRequest
 import logging
 from datetime import datetime
+from app.models.group import GroupAccount
 
 logger = logging.getLogger(__name__)
 
@@ -87,30 +88,119 @@ class TradeOrchestrator:
         )
         
         self.db.add(trade)
+        await self.db.flush()
         await self.db.commit()
         await self.db.refresh(trade)
         
         logger.info(f"Created trade {trade.trade_id} for {trade_request.symbol}")
-        
-        # Get matching accounts (either specific IDs or all enabled)
-        if trade_request.account_ids:
-            from sqlalchemy import and_
+
+        # =====================================================================
+        # ACCOUNT SELECTION LOGIC — 3 paths:
+        #   1. accounts_with_qty → diffQty mode (per-account quantities)
+        #   2. account_ids       → normal selection (with group resolution)
+        #   3. fallback          → ALL enabled accounts
+        # =====================================================================
+
+        qty_map = {}
+
+        if trade_request.accounts_with_qty:
+            # ── PATH 1: diffQty ON — accounts_with_qty provided ──
+            account_ids = []
+
+            for item in trade_request.accounts_with_qty:
+
+                # CASE 1: GROUP
+                if item.get("group_id"):
+                    result = await self.db.execute(
+                        select(GroupAccount.account_id).where(
+                            GroupAccount.group_id == item["group_id"]
+                        )
+                    )
+                    group_accounts = result.scalars().all()
+            
+                    for acc_id in group_accounts:
+                        account_ids.append(acc_id)
+                        qty_map[acc_id] = item["quantity"]
+            
+                # CASE 2: ACCOUNT
+                elif item.get("account_id"):
+                    acc_id = item["account_id"]
+                    account_ids.append(acc_id)
+                    qty_map[acc_id] = item["quantity"]
+            
+            # REMOVE DUPLICATES
+            account_ids = list(set(account_ids))
+
+            # FETCH ACTUAL ACCOUNT OBJECTS
             result = await self.db.execute(
                 select(Account).where(
                     and_(
                         Account.owner_id == current_user.user_id,
-                        Account.account_id.in_(trade_request.account_ids),
+                        Account.account_id.in_(account_ids),
                         Account.is_enabled == True
                     )
                 )
             )
             accounts = result.scalars().all()
+
+        elif trade_request.account_ids:
+            # ── PATH 2: Normal mode — specific account_ids selected ──
+            account_ids = list(trade_request.account_ids)
+
+            # When groupAcc is ON, account_ids actually contains GROUP IDs
+            # We need to resolve them to actual account IDs via GroupAccount
+            if trade_request.groupAcc:
+                group_ids = account_ids
+                account_ids = []
+                for gid in group_ids:
+                    result = await self.db.execute(
+                        select(GroupAccount.account_id).where(
+                            GroupAccount.group_id == gid
+                        )
+                    )
+                    group_accounts = result.scalars().all()
+                    account_ids.extend(group_accounts)
+                # Remove duplicates (account may be in multiple groups)
+                account_ids = list(set(account_ids))
+                logger.info(f"Resolved {len(group_ids)} groups to {len(account_ids)} account IDs")
+
+            result = await self.db.execute(
+                select(Account).where(
+                    and_(
+                        Account.owner_id == current_user.user_id,
+                        Account.account_id.in_(account_ids),
+                        Account.is_enabled == True
+                    )
+                )
+            )
+            accounts = result.scalars().all()
+
         else:
-            accounts = await AccountService.get_user_accounts(self.db, current_user.user_id, enabled_only=True)
-        
+            # ── PATH 3: Fallback — no selection, use ALL enabled accounts ──
+            accounts = await AccountService.get_user_accounts(
+                self.db,
+                current_user.user_id,
+                enabled_only=True
+            )
+
+        # COMMON VALIDATION
         if not accounts:
-            logger.warning(f"No valid/enabled accounts found for trade {trade.trade_id}")
+            logger.warning(
+                f"Trade {trade.trade_id}: No valid/enabled accounts found for execution"
+            )
             return trade
+        
+        # 🚀 PRELOAD 5PAISA INSTRUMENTS (ADD HERE)
+        preload_tasks = []
+        
+        for account in accounts:
+            if account.broker_name == BrokerName.FIVEPAISA.value:
+                adapter = await self._get_adapter(account)
+                preload_tasks.append(adapter.get_instruments(trade_request.exchange))
+        
+        if preload_tasks:
+            logger.info("🚀 Preloading 5paisa instruments...")
+            await asyncio.gather(*preload_tasks, return_exceptions=True)
         
         # 1 Pre-initialize all adapters in parallel
         logger.debug(f"Pre-initializing {len(accounts)} adapters...")
@@ -127,7 +217,13 @@ class TradeOrchestrator:
             adapter = adapters[i]
             
             # 1. Multiplier Logic
-            qty = trade_request.quantity
+            if qty_map:
+                if account.account_id not in qty_map:
+                    logger.warning(f"Skipping account {account.account_id} (no qty provided)")
+                    continue
+                qty = qty_map[account.account_id]
+            else:
+                qty = trade_request.quantity
             if trade_request.multiplier and account.multiplier > 0:
                 qty = int(qty * account.multiplier)
                 logger.debug(f"Applied multiplier {account.multiplier} for account {account.account_id}: {trade_request.quantity} -> {qty}")
@@ -228,14 +324,13 @@ class TradeOrchestrator:
             
         Returns:
             Prepared order request dictionary
-        """
-        
-        normalized = adapter.normalize_symbol(trade_request.symbol, trade_request.exchange)
-        
+        """        
         
         # Common parameters
         order_params = {
-            "tradingsymbol": normalized,
+            "symbol": trade_request.symbol,
+            "tradingsymbol": trade_request.symbol,
+            "scrip_code": getattr(trade_request, "scrip_code", None),            
             "exchange": trade_request.exchange,
             "transaction_type": trade_request.side.value if hasattr(trade_request.side, 'value') else trade_request.side,
             "quantity": quantity,
@@ -257,8 +352,6 @@ class TradeOrchestrator:
         
         return order_params
         
-        return order_request
-    
     async def _execute_single_order(
         self,
         trade: Trade,
@@ -280,8 +373,6 @@ class TradeOrchestrator:
         """
         try:
             start_time = time.time()
-            
-            # Place order
             result = await adapter.place_order(order_request)
             
             execution_time_ms = (time.time() - start_time) * 1000

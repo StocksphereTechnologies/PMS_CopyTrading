@@ -21,6 +21,7 @@ import GroupAccounts from "./Pages/Settings/GroupAccounts/GroupAccounts";
 import CreateTradingAccount from "./Pages/Settings/TradingAccounts/CreateTradingAccount";
 import ValidateAll from './Pages/Settings/TradingAccounts/ValidateAll.tsx';
 import CreateGroupAccount from './Pages/Settings/GroupAccounts/CreateGroupAccount.tsx';
+import Trade from './Pages/Trading/Trade/Trade.tsx'
 
 const App: React.FC = () => {
 
@@ -31,7 +32,7 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/" element={<Navigate to="/trading/portfolio" replace />} />
-        
+
         {/* Protected Routes */}
         <Route path="/*" element={
           <ProtectedRoute>
@@ -49,13 +50,14 @@ const App: React.FC = () => {
                   <Route path="/trading/margins" element={<Margins />} />
                   <Route path="/trading/holdings" element={<Holdings />} />
                   <Route path="/trading/notifications" element={<Notifications />} />
-                  <Route path='/Screener/Screener' element={<Screener />} /> 
+                  <Route path='/Screener/Screener' element={<Screener />} />
                   <Route path="/settings/tradingaccounts" element={<TradingAccounts />} />
                   <Route path="/settings/pseudoaccounts" element={<PseudoAccounts />} />
                   <Route path="/settings/groupaccounts" element={<GroupAccounts />} />
                   <Route path="/settings/tradingaccounts/createtradingaccount" element={<CreateTradingAccount />} />
                   <Route path="/settings/tradingaccounts/validateall" element={<ValidateAll />} />
-                  <Route path="/settings/groupaccounts/creategroupaccount" element={<CreateGroupAccount />} />
+                  <Route path="/settings/groupaccounts/creategroupaccount/:id?" element={<CreateGroupAccount />} />        
+                  <Route path="/trading/trade" element={<Trade />} />        
                 </Routes>
               </div>
             </>

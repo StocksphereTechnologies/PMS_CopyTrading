@@ -1,5 +1,8 @@
 """
-Trade schemas for request/response validation
+Fixed version of app/schemas/trade.py
+Includes:
+1. 'scrip_code' in TradeRequest
+2. 'TradeListResponse' (fixed missing class)
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
@@ -12,12 +15,13 @@ class TradeRequest(BaseModel):
     # Core parameters
     symbol: str = Field(..., min_length=1, description="Trading symbol (e.g., RELIANCE, INFY)")
     exchange: str = Field(..., min_length=1, description="Exchange (NSE, BSE, NFO, etc.)")
+    scrip_code: Optional[int] = Field(None, description="Numeric ScripCode for 5paisa (from search result)")
     side: OrderSide = Field(..., description="BUY or SELL")
     quantity: int = Field(..., gt=0, description="Quantity to trade")
     order_type: OrderType = Field(..., description="Order type: MARKET, LIMIT, SL, SL_M")
     
     # Target execution
-    account_ids: Optional[List[int]] = Field(None, description="Specific account IDs to execute on. If None, executes on ALL enabled accounts.")
+    account_ids: Optional[List[int]] = Field(None, description="Specific account IDs")
     
     # Price parameters
     price: Optional[float] = Field(None, gt=0, description="Price for LIMIT/SL orders")
@@ -28,9 +32,8 @@ class TradeRequest(BaseModel):
     disclosed_quantity: Optional[int] = Field(None, gt=0, description="Quantity to disclose publicly")
     
     # BO/CO specific (Trigger/Target/Stoploss)
-    # Using specific names from frontend Trade.tsx
-    Target: Optional[float] = Field(None, gt=0, description="Profit target for BO")
-    Stoploss: Optional[float] = Field(None, gt=0, description="Stoploss for BO/CO")
+    Target: Optional[float] = Field(None, gt=0, description="Profit target")
+    Stoploss: Optional[float] = Field(None, gt=0, description="Stoploss")
     trailing_stoploss: Optional[float] = Field(None, gt=0, alias="Trail. Stoploss")
     
     # Metadata from UI
@@ -39,41 +42,42 @@ class TradeRequest(BaseModel):
     tag: Optional[str] = None
     
     # UI Toggles / Orchestration
-    amo: bool = Field(False, description="After Market Order")
-    groupAcc: bool = Field(False, description="Group Accounts")
-    diffQty: bool = Field(False, description="Different Quantities")
-    multiplier: bool = Field(False, description="Use Multiplier")
+    amo: bool = Field(False)
+    groupAcc: bool = Field(False)
+    diffQty: bool = Field(False)
+    multiplier: bool = Field(False)
     
     # Splitting
-    split: str = Field("NO", description="NO, AUTO, QTY")
-    splitQty: Optional[int] = Field(None, description="Quantity for split")
+    split: str = Field("NO")
+    splitQty: Optional[int] = None
     
+    # Used for different quantities mode
+    accounts_with_qty: Optional[List[dict]] = None
+
     class Config:
         json_schema_extra = {
             "example": {
                 "symbol": "RELIANCE",
                 "exchange": "NSE",
+                "scrip_code": 2885,
                 "side": "BUY",
                 "quantity": 10,
                 "order_type": "LIMIT",
                 "price": 2500.0,
                 "product": "INTRADAY",
-                "variety": "regular",
-                "validity": "DAY",
                 "account_ids": [1]
             }
         }
 
 
 class TradeExecutionDetail(BaseModel):
-    """Schema for individual execution detail"""
     account_id: int
     broker: str
     order_id: Optional[str] = None
     status: OrderStatus
     executed_price: Optional[float] = None
     executed_quantity: Optional[int] = None
-    error_reason: Optional[str] = None
+    error_reason: Optional[str] = None # Support Text from SQLAlchemy if needed
     execution_time_ms: Optional[float] = None
     
     class Config:
@@ -81,9 +85,8 @@ class TradeExecutionDetail(BaseModel):
 
 
 class TradeResponse(BaseModel):
-    """Schema for trade response"""
     trade_id: int
-    owner_id: Optional[int] = None  
+    owner_id: Optional[int] = None
     symbol: str
     exchange: str
     side: str
@@ -91,13 +94,12 @@ class TradeResponse(BaseModel):
     order_type: str
     price: Optional[float]
     created_at: datetime
-    # Map 'executions' from model to 'details' in response
     details: List[TradeExecutionDetail] = Field(validation_alias="executions")
-    total_execution_time_ms: Optional[float] = None  
-        
+    total_execution_time_ms: Optional[float] = None
+    
     class Config:
         from_attributes = True
-        populate_by_name = True  # Allow both 'details' and 'executions' as field names
+        populate_by_name = True
 
 
 class TradeListResponse(BaseModel):

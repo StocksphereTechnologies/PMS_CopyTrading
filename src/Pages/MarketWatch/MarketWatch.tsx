@@ -1,39 +1,98 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Row, Col, Dropdown, Select } from "antd";
-import { DownOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
+import axios from "axios";
 import MarketWatchTable from "./MarketWatchTable";
-
-const { Option } = Select;
 
 const MarketWatch: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [watchlist, setWatchlist] = useState<any[]>([]);
+  const [liveData, setLiveData] = useState<Record<string, any>>({});
 
-  // Dummy symbols (replace later with API)
-  const symbols: string[] = [
-    "NIFTY",
-    "BANKNIFTY",
-    "RELIANCE",
-    "TCS",
-  ];
+  // ✅ LTP Polling
+  useEffect(() => {
+    if (watchlist.length === 0) return;
 
-  const filteredSymbols =
-    searchText.length >= 2
-      ? symbols.filter((s) =>
-        s.toLowerCase().includes(searchText.toLowerCase())
-      )
-      : [];
+    const fetchLTP = async () => {
+      try {
+        const instruments = watchlist.map((item) => ({
+          scrip_code: item.scrip_code,
+          exchange: item.exchange,
+          symbol: item.symbol,
+          name: item.name,
+        }));
+
+        const res = await axios.post(
+          "http://localhost:8000/api/v1/marketwatch/ltp",
+          { instruments }
+        );
+
+        const data = res.data?.data || [];
+
+        setLiveData((prev) => {
+          const next = { ...prev };
+          data.forEach((tick: any) => {
+            if (tick.symbol) next[tick.symbol] = tick;
+          });
+          return next;
+        });
+      } catch (err) {
+        console.error("LTP error", err);
+      }
+    };
+
+    fetchLTP();
+    const interval = setInterval(fetchLTP, 3000);
+    return () => clearInterval(interval);
+  }, [watchlist]);
+
+  // ✅ Search
+  const handleSearch = async (val: string) => {
+    setSearchText(val);
+
+    if (val.length >= 2) {
+      try {
+        const res = await axios.get(
+          "http://localhost:8000/api/v1/marketwatch/search",
+          { params: { q: val } }
+        );
+        setSearchResults(res.data.instruments || []);
+      } catch (err) {
+        console.error("Search error", err);
+      }
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  // ✅ Add
+  const addToWatchlist = (item: any) => {
+    setWatchlist((prev) => {
+      if (prev.find((i) => i.symbol === item.symbol)) return prev;
+      return [...prev, item];
+    });
+
+    setOpen(false);
+    setSearchText("");
+  };
+
+  // ✅ Remove
+  const removeFromWatchlist = (symbol: string) => {
+    setWatchlist((prev) =>
+      prev.filter((item) => item.symbol !== symbol)
+    );
+
+    setLiveData((prev) => {
+      const next = { ...prev };
+      delete next[symbol];
+      return next;
+    });
+  };
 
   const dropdownContent = (
-    <div
-      style={{
-        background: "#fff",
-        padding: 10,
-        width: 300,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        borderRadius: 4,
-      }}
-    >
+    <div style={{ background: "#fff", padding: 12, width: 350 }}>
       <Select
         showSearch
         autoFocus
@@ -41,59 +100,59 @@ const MarketWatch: React.FC = () => {
         style={{ width: "100%" }}
         value={searchText || undefined}
         filterOption={false}
-        onSearch={(val) => setSearchText(val)}
-        notFoundContent={
-          searchText.length < 2
-            ? "Please enter 2 or more characters"
-            : "No symbol found"
-        }
-      >
-        {filteredSymbols.map((sym) => (
-          <Option key={sym} value={sym}>
-            {sym}
-          </Option>
+        onSearch={handleSearch}
+        dropdownStyle={{ display: "none" }}
+        open={false}
+      />
+
+      <div style={{ maxHeight: 250, overflowY: "auto", marginTop: 8 }}>
+        {searchResults.map((item) => (
+          <div
+            key={item.symbol}
+            onClick={() => addToWatchlist(item)}
+            style={{
+              padding: 10,
+              cursor: "pointer",
+              borderBottom: "1px solid #f0f0f0",
+            }}
+          >
+            <b>{item.symbol}</b> ({item.exchange}) - ₹
+            {item.last_price || "--"}
+          </div>
         ))}
-      </Select>
+      </div>
     </div>
   );
 
   return (
     <div style={{ padding: 16 }}>
-      {/* Search & Add Symbol */}
       <Row style={{ marginBottom: 12 }}>
         <Col>
           <Dropdown
             open={open}
-            onOpenChange={(flag) => {
-              setOpen(flag);
-              if (!flag) {
-                setSearchText(""); // clear search when closed
-              }
-            }}
+            onOpenChange={setOpen}
             dropdownRender={() => dropdownContent}
             trigger={["click"]}
           >
             <Button
               type="primary"
-              icon={<DownOutlined />}
-              style={{
-                background: "#14b8a6",
-                borderColor: "#14b8a6",
-                height: 40,
-                fontSize: 14,
-                fontWeight: 500,
-                padding: "0 18px",
-              }}
+              icon={<SearchOutlined />}
+              style={{ background: "#14b8a6", borderColor: "#14b8a6" }}
             >
-              Search & add symbol to the marketwatch
+              Search & Add Symbol
             </Button>
           </Dropdown>
         </Col>
       </Row>
 
-      <MarketWatchTable />
+      <MarketWatchTable
+        data={watchlist}
+        liveData={liveData}
+        onDelete={removeFromWatchlist}
+      />
     </div>
   );
 };
 
 export default MarketWatch;
+
