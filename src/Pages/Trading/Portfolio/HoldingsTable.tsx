@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Table, Select } from "antd";
+import { holdingsService, Holding } from "../../../Services/holdingsService";
 
 const { Option } = Select;
-
-const initialData: any[] = [];
 
 const parseCurrency = (val: any) =>
   parseFloat(String(val).replace(/[^0-9.-]+/g, "")) || 0;
@@ -19,7 +18,7 @@ const columns = [
     key: "trdAcc",
     title: "Trd Acc",
     dataIndex: "trdAcc",
-    sorter: (a: any, b: any) =>String(a.trdAcc).localeCompare(String(b.trdAcc)),
+    sorter: (a: any, b: any) => String(a.trdAcc).localeCompare(String(b.trdAcc)),
   },
   {
     key: "exchange",
@@ -43,13 +42,15 @@ const columns = [
     key: "ltp",
     title: "LTP",
     dataIndex: "ltp",
-    sorter: (a: any, b: any) => String(a.ltp).localeCompare(String(b.ltp)),
+    render: (val: number) => `₹${val.toFixed(2)}`,
+    sorter: (a: any, b: any) => Number(a.ltp) - Number(b.ltp)
   },
   {
     key: "currval",
     title: "Curr Val",
     dataIndex: "currval",
-    sorter: (a: any, b: any) => String(a.currval).localeCompare(String(b.currval)),
+    render: (val: number) => `₹${val.toFixed(2)}`,
+    sorter: (a: any, b: any) => Number(a.currval) - Number(b.currval)
   },
   {
     key: "quantity",
@@ -67,7 +68,12 @@ const columns = [
     key: "pnl",
     title: "PnL",
     dataIndex: "pnl",
-    sorter: (a: any, b: any) => String(a.pnl).localeCompare(String(b.pnl)),
+    render: (val: number) => (
+      <span style={{ color: val >= 0 ? "green" : "red", fontWeight: 600 }}>
+        {val.toFixed(2)}
+      </span>
+    ),
+    sorter: (a: any, b: any) => Number(a.pnl) - Number(b.pnl)
   },
   {
     key: "product",
@@ -121,7 +127,7 @@ const columns = [
     key: "avgPrice",
     title: "Avg Price",
     dataIndex: "avgPrice",
-    sorter: (a: any, b: any) => String(a.avgPrice).localeCompare(String(b.avgPrice)),
+    sorter: (a: any, b: any) => Number(a.avgPrice) - Number(b.avgPrice)
   },
 
   {
@@ -144,25 +150,76 @@ const columns = [
   },
 ];
 
-
-const HoldingsTable: React.FC = () => {
+const HoldingsTable: React.FC<any> = ({
+  searchText,
+  setFilteredData,
+  selectedRowKeys,
+  setSelectedRowKeys,
+}) => {
+  const [data, setData] = useState<Holding[]>([]);
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
-  const [filteredData, setFilteredData] = useState(initialData);
+  const [loading, setLoading] = useState(false);
+  const [localFilteredData, setLocalFilteredData] = useState<Holding[]>([]);
+
+  const fetchHoldings = async () => {
+    try {
+      setLoading(true);
+      const res = await holdingsService.getAll();
+      setData(res.holdings || []);
+    } catch (err) {
+      console.error("Holdings fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHoldings();
+  }, []);
+
+  useEffect(() => {
+    let temp = data;
+
+    // 🔍 SEARCH
+    if (searchText) {
+      const words = searchText.toLowerCase().split(" ");
+      temp = temp.filter((row: any) =>
+        words.every((word: string) => Object.values(row).some((val) =>
+          String(val).toLowerCase().includes(word)
+        )
+        )
+      );
+    }
+
+    // 🔽 COLUMN FILTER
+    Object.keys(filters).forEach((k) => {
+      if (filters[k]) {
+        temp = temp.filter((row: any) =>
+          String(row[k]).toLowerCase().includes(filters[k].toLowerCase())
+        );
+      }
+    });
+
+    setLocalFilteredData(temp);
+    setFilteredData(temp); // 🔥 VERY IMPORTANT (for parent buttons)
+  }, [data, filters, searchText]);
 
   const handleColumnFilter = (value: string, key: string) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
 
-    let data = initialData;
+    let temp = data;
+
     Object.keys(newFilters).forEach((k) => {
       if (newFilters[k]) {
-        data = data.filter((row: any) =>
+        temp = temp.filter((row: any) =>
           String(row[k]).toLowerCase().includes(newFilters[k].toLowerCase())
         );
       }
     });
 
-    setFilteredData(data);
+    setLocalFilteredData(temp);
+    setFilteredData(temp);
   };
 
   const filterRow = (
@@ -170,6 +227,7 @@ const HoldingsTable: React.FC = () => {
       {columns.map((col: any) => (
         <th key={col.dataIndex}>
           <Select
+            showSearch
             allowClear
             size="small"
             style={{ width: "100%" }}
@@ -181,12 +239,22 @@ const HoldingsTable: React.FC = () => {
     </tr>
   );
 
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => {
+      setSelectedRowKeys(keys);
+    },
+  };
+
   return (
     <Table
       bordered
+      rowKey={(record) => record.insttoken || record.symbol}
       pagination={false}
+      loading={loading}
       columns={columns}
-      dataSource={filteredData}
+      rowSelection={rowSelection}
+      dataSource={localFilteredData}
       scroll={{ x: "max-content" }}
       locale={{ emptyText: "" }}
       components={{
@@ -200,7 +268,7 @@ const HoldingsTable: React.FC = () => {
         },
         body: {
           wrapper: (props: any) =>
-            filteredData.length === 0 ? (
+            localFilteredData.length === 0 ? (
               <tbody>
                 <tr>
                   <td
@@ -219,5 +287,5 @@ const HoldingsTable: React.FC = () => {
     />
   );
 };
-
+export const holdingsColumns = columns;
 export default HoldingsTable;

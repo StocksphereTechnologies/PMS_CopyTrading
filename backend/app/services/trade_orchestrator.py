@@ -94,13 +94,6 @@ class TradeOrchestrator:
         
         logger.info(f"Created trade {trade.trade_id} for {trade_request.symbol}")
 
-        # =====================================================================
-        # ACCOUNT SELECTION LOGIC — 3 paths:
-        #   1. accounts_with_qty → diffQty mode (per-account quantities)
-        #   2. account_ids       → normal selection (with group resolution)
-        #   3. fallback          → ALL enabled accounts
-        # =====================================================================
-
         qty_map = {}
 
         if trade_request.accounts_with_qty:

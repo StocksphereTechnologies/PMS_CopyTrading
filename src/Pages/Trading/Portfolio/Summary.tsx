@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { summaryService } from '../../../Services/summaryService'
-
+import { Card, Row, Col } from "antd";
 import SummaryTable from './SummaryTable'
 import SymbolLevelSummary from './SymbolLevelSummary'
 import PositionAnalyticsSummary from './PositionAnalyticsSummary'
@@ -75,7 +75,6 @@ const Summary = () => {
   return (
 
     <div>
-
       <SummaryTable data={data.account_summary} />
 
       <SymbolLevelSummary data={data.symbol_summary} />

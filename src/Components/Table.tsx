@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Table, Input, Button, Space, Select } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { TableProps } from 'antd';
+import * as XLSX from "xlsx-js-style";
+import { saveAs } from "file-saver";
 
 interface SmartTableProps extends Omit<TableProps<any>, 'title'> {
     title?: string;
@@ -73,6 +75,65 @@ const SmartTable: React.FC<SmartTableProps> = ({
         setFilteredData(tempData)
     }
 
+    // ✅ EXCEL DOWNLOAD
+    const handleExportExcel = () => {
+        const headers = (columns as any[])
+            .flatMap((col: any) => col.children ? col.children : [col])
+            .map((col: any) => col.dataIndex)
+            .filter(Boolean);
+
+        const worksheet = XLSX.utils.json_to_sheet(filteredData || [], {
+            header: headers,
+            skipHeader: false,
+        });
+
+        // ✅ MAKE HEADER BOLD
+        headers.forEach((header: string, index: number) => {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
+
+            if (worksheet[cellAddress]) {
+                worksheet[cellAddress].s = {
+                    font: {
+                        bold: true,
+                    },
+                };
+            }
+        });
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, title || "Summary");
+
+        const excelBuffer = XLSX.write(workbook, {
+            bookType: "xlsx",
+            type: "array",
+        });
+
+        const blob = new Blob([excelBuffer], {
+            type: "application/octet-stream",
+        });
+
+        saveAs(blob, `${title || "Summary"}_${Date.now()}.xlsx`);
+    };
+
+    // ✅ CSV DOWNLOAD
+    const handleExportCSV = () => {
+        const headers = (columns as any[])
+            .flatMap((col: any) => col.children ? col.children : [col])
+            .map((col: any) => col.dataIndex)
+            .filter(Boolean);
+
+        const worksheet = XLSX.utils.json_to_sheet(filteredData || [], {
+            header: headers,
+            skipHeader: false,
+        });
+
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+        saveAs(blob, `${title || "Summary"}_${Date.now()}.csv`);
+    };
+
     const leafColumns = (columns as any[]).flatMap((col: any) =>
         col.children ? col.children : [col]
     )
@@ -117,8 +178,19 @@ const SmartTable: React.FC<SmartTableProps> = ({
 
             <Space style={{ marginBottom: 16 }}>
                 {exportButtons && <>
-                    <Button>Excel</Button>
-                    <Button>CSV</Button>
+                    <Button
+                        style={{ background: "#36454F", color: "#fff", fontWeight: "bold" }}
+                        onClick={handleExportExcel}
+                    >
+                        Excel
+                    </Button>
+
+                    <Button
+                        style={{ background: "#36454F", color: "#fff", fontWeight: "bold" }}
+                        onClick={handleExportCSV}
+                    >
+                        CSV
+                    </Button>
                 </>}
             </Space>
 

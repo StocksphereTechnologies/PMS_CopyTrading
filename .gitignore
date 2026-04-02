@@ -50,3 +50,5 @@ dist/
 .env
 .vite/
 node_modules
+
+backend/instruments_cache_5paisa.json

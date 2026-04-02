@@ -248,5 +248,5 @@ const MarginsTable: React.FC<MarginsTableProps> = ({
     />
   );
 };
-
+export const marginColumns = columns;
 export default MarginsTable;

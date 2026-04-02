@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import accounts, positions, trades, summary, group_router, marketwatch
+from app.api.routes import accounts, positions, trades, summary, group_router, marketwatch, holdings
 from app.api.endpoints import auth
 from app.core.database import engine, Base
 from contextlib import asynccontextmanager
@@ -45,6 +45,7 @@ app.include_router(trades.router, prefix=settings.API_V1_PREFIX)
 app.include_router(marketwatch.router,prefix=settings.API_V1_PREFIX)
 app.include_router(summary.router, prefix=settings.API_V1_PREFIX)
 app.include_router(group_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(holdings.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():

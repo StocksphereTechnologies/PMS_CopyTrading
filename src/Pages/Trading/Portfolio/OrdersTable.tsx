@@ -345,5 +345,5 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
     />
   );
 };
-
+export const orderColumns = columns;
 export default OrdersTable;

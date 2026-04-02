@@ -9,6 +9,9 @@ import {
   Space,
 } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
+import * as XLSX from "xlsx-js-style";
+import { saveAs } from "file-saver";
+import { orderColumns } from "./OrdersTable";
 
 import OrdersTable from "./OrdersTable";
 import OrdersSummaryCount from "./OrdersSummaryCount";
@@ -96,6 +99,60 @@ const Orders: React.FC = () => {
 
   const handleDeselectAll = () => {
     setSelectedRowKeys([]);
+  };
+
+  const handleExportExcel = () => {
+    const headers = (orderColumns as any[])
+      .flatMap((col: any) => col.children ? col.children : [col])
+      .map((col: any) => col.dataIndex)
+      .filter(Boolean);
+
+    const worksheet = XLSX.utils.json_to_sheet(filteredOrders || [], {
+      header: headers,
+      skipHeader: false,
+    });
+
+    // ✅ Bold header
+    headers.forEach((_, index) => {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
+      if (worksheet[cellAddress]) {
+        worksheet[cellAddress].s = {
+          font: { bold: true },
+        };
+      }
+    });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const blob = new Blob([excelBuffer], {
+      type: "application/octet-stream",
+    });
+
+    saveAs(blob, `Orders_${Date.now()}.xlsx`);
+  };
+
+  const handleExportCSV = () => {
+    const headers = (orderColumns as any[])
+      .flatMap((col: any) => col.children ? col.children : [col])
+      .map((col: any) => col.dataIndex)
+      .filter(Boolean);
+
+    const worksheet = XLSX.utils.json_to_sheet(filteredOrders || [], {
+      header: headers,
+      skipHeader: false,
+    });
+
+    const csv = XLSX.utils.sheet_to_csv(worksheet);
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    saveAs(blob, `Orders_${Date.now()}.csv`);
   };
 
   return (
@@ -190,6 +247,7 @@ const Orders: React.FC = () => {
                 backgroundColor: "#36454F",
                 color: "#fff",
               }}
+              onClick={handleExportExcel}
             >
               Excel
             </Button>
@@ -203,6 +261,7 @@ const Orders: React.FC = () => {
                 backgroundColor: "#36454F",
                 color: "#fff",
               }}
+              onClick={handleExportCSV}
             >
               CSV
             </Button>

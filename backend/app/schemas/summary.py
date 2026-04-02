@@ -23,6 +23,13 @@ class AccountSummary(BaseModel):
     orderOpen: int
     orderTPend: int
 
+    holdingCount: int
+    holdingPnl: float
+    currVal: float
+    holdingTotalQty: float
+    holdingQty: float
+    holdingT1Qty: float
+
 
 class SymbolSummary(BaseModel):
     exchange: str
@@ -73,7 +80,8 @@ class SummaryResponse(BaseModel):
 
     account_summary: List[AccountSummary]
     symbol_summary: List[SymbolSummary]
-
+    
+    positions_day_analytics: PositionsAnalytics
     positions_analytics: PositionsAnalytics
     orders_analytics: OrdersAnalytics
     margin_analytics: MarginAnalytics

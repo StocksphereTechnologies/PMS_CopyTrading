@@ -22,6 +22,13 @@ export interface AccountSummary {
   orderComplete: number
   orderRejected: number
   orderCancelled: number
+
+  holdingCount: number
+  holdingPnl: number
+  currVal: number
+  holdingTotalQty: number
+  holdingQty: number
+  holdingT1Qty: number
 }
 
 export interface SymbolSummary {
@@ -70,30 +77,17 @@ export interface MarginAnalytics {
 }
 
 export interface SummaryResponse {
-
   account_summary: AccountSummary[]
-
   symbol_summary: SymbolSummary[]
-
   positions_analytics: PositionsAnalytics
-
   orders_analytics: OrdersAnalytics
-
   margin_analytics: MarginAnalytics
-
   last_updated: string
 }
 
-/* ===============================
-   Service
-================================ */
-
 export const summaryService = {
-
   getSummary: async (): Promise<SummaryResponse> => {
-
     const response = await apiClient.get('/summary')
-
     return response.data
   }
 

@@ -176,8 +176,61 @@ class ZerodhaAdapter(BrokerInterface):
             logger.error(f"Error fetching orders from Zerodha: {e}")
             return []
     
+    async def get_holdings(self) -> List[Dict]:
+        """Fetch holdings from Zerodha"""
+        try:
+            print(f"DEBUG: Fetching holdings for {self.account.account_id}", flush=True)
     
-       
+            data = await self._make_request("GET", "/portfolio/holdings")
+    
+            raw_holdings = data.get("data", [])
+    
+            holdings = []
+    
+            for h in raw_holdings:
+                qty = int(h.get("quantity", 0))
+                t1 = int(h.get("t1_quantity", 0))
+                total_qty = qty + t1
+    
+                ltp = float(h.get("last_price", 0))
+                avg_price = float(h.get("average_price", 0))
+    
+                current_value = total_qty * ltp
+                invested_value = total_qty * avg_price
+                pnl = current_value - invested_value
+    
+                holdings.append({
+                    "pseAcc": self.account.nickname,
+                    "trdAcc": self.account.trading_login_id,
+                    "exchange": h.get("exchange", ""),
+                    "symbol": h.get("tradingsymbol", ""),
+                    "totqty": total_qty,
+                    "ltp": ltp,
+                    "currval": current_value,
+                    "quantity": qty,
+                    "t1qty": t1,
+                    "pnl": pnl,
+                    "account_id": self.account.account_id,
+                    "product": "DELIVERY",
+                    "nsesymbol": h.get("tradingsymbol", ""),
+                    "bsesymbol": "",
+                    "isin": h.get("isin", ""),
+                    "insttoken": str(h.get("instrument_token", "")),
+                    "collateralQty": h.get("collateral_quantity", 0),
+                    "collateralType": "",
+                    "haircut": 0,
+                    "avgPrice": avg_price,
+                    "day": "DAY",
+                    "platform": "Kite",
+                    "broker": "ZERODHA"
+                })
+    
+            return holdings
+    
+        except Exception as e:
+            logger.error(f"Zerodha holdings error: {e}")
+            return []
+           
     def _transform_margins(self, raw_margins: Dict[str, Any]) -> Dict[str, Any]:
         """Transform Zerodha margin response to unified format"""
         from datetime import datetime, timezone

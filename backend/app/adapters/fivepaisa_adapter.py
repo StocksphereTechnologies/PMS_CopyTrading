@@ -265,6 +265,102 @@ class FivePaisaAdapter(BrokerInterface):
     
     async def get_positions(self) -> List[Dict]:
         return []
+
+    async def get_holdings(self) -> List[Dict]:
+        """Fetch holdings from 5paisa"""
+        try:
+            token = str(self.account.access_token or "").strip()
+    
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "5Paisa-API-Uid": str(self.account.user_key)
+            }
+    
+            payload = {
+                "head": {"key": self.account.user_key},
+                "body": {"ClientCode": self.account.trading_login_id}
+            }
+    
+            url = "https://Openapi.5paisa.com/VendorsAPI/Service1.svc/V3/Holding"
+    
+            client = HttpClient.get_client()
+            response = await client.post(url, json=payload, headers=headers)
+    
+            if response.status_code != 200:
+                return []
+    
+            data = response.json()
+            raw = data.get("body", {}).get("Data", [])
+    
+            holdings = []
+    
+            for h in raw:
+                print("RAW 5PAISA HOLDING:", h)
+
+                # ✅ Correct fields from 5paisa
+                symbol = h.get("Symbol") or ""
+                
+                # Exchange mapping
+                exch = h.get("Exch")
+                if exch == "N":
+                    exchange = "NSE"
+                elif exch == "B":
+                    exchange = "BSE"
+                else:
+                    exchange = ""
+                
+                qty = int(h.get("Quantity", 0))
+                pool = int(h.get("PoolQty", 0))
+
+                t1 = pool
+                total_qty = max(qty, pool)
+
+                ltp = float(h.get("CurrentPrice") or 0)
+                avg_price = float(h.get("AvgRate") or 0)
+
+                current_value = total_qty * ltp
+                invested_value = total_qty * avg_price
+                pnl = current_value - invested_value
+                
+                holdings.append({
+                    "pseAcc": self.account.nickname,
+                    "trdAcc": self.account.trading_login_id,
+                
+                    "symbol": symbol,              # ✅ FIXED
+                    "exchange": exchange,          # ✅ FIXED
+                
+                    "totqty": total_qty,
+                    "ltp": ltp,                   # ✅ FIXED
+                    "currval": current_value,
+                    "quantity": qty,
+                    "t1qty": t1,
+                    "pnl": pnl,
+                
+                    "account_id": self.account.account_id,
+                
+                    "product": "DELIVERY",
+                    "nsesymbol": symbol,
+                    "bsesymbol": "",
+                    "isin": "",
+                    "insttoken": "",  # reserved for Zerodha only
+                    "scripcode": str(h.get("NseCode") or h.get("ScripCode") or ""),
+                
+                    "collateralQty": 0,
+                    "collateralType": "",
+                    "haircut": 0,
+                    "avgPrice": avg_price,
+                
+                    "day": "DAY",
+                    "platform": "5paisa",
+                    "broker": "FIVEPAISA"
+                })
+    
+            return holdings
+    
+        except Exception as e:
+            logger.error(f"5paisa holdings error: {e}")
+            return []
     
     async def _download_scrip_master(self, exchange: str = "NSE") -> str:
         """Download scrip master CSV.
@@ -476,7 +572,7 @@ class FivePaisaAdapter(BrokerInterface):
 
     async def get_ltp(self, symbol: str, exchange: str) -> Optional[float]:
         """Get LTP from 5paisa (Mock)"""
-        return 2500.50
+        return None
     
     def normalize_symbol(self, symbol: str, exchange: str) -> str:
         """Normalize symbol for 5paisa"""
